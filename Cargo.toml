@@ -1,0 +1,8 @@
+[package]
+name = "mcworld"
+version = "0.1.0"
+authors = ["Daniël Louwrink <daniel.louwrink@gmail.com>"]
+
+[dependencies]
+leveldb = { path = "../leveldb" }
+byteorder = "1.2"
