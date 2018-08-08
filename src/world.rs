@@ -1,88 +1,107 @@
-use std::io::{Cursor, Write};
-use byteorder::{LittleEndian, WriteBytesExt};
+use std::io::{Cursor, Read, Write};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use leveldb::database::Database;
 use leveldb::options::{Compression, Options, ReadOptions};
 use std::path::Path;
+use nbt::{Blob, Value};
 
 use error::*;
 
-mod nibbles {
-    #[derive(Debug, Copy, Clone)]
-    enum NibbleState {
-        High,
-        Low,
-        Done,
+pub fn decode_chunk<T: Read>(reader: &mut T) -> Result<Chunk> {
+    let version = reader.read_u8()?;
+    assert_eq!(version, 8);
+
+    let num_storages = reader.read_u8()?;
+
+    let mut storages = Vec::new();
+    for _ in 0..num_storages {
+        storages.push(decode_storage(reader)?);
     }
 
-    pub struct Nibbles {
-        high: u8,
-        low: u8,
-        state: NibbleState,
+    Ok(Chunk { block_storages: storages })
+}
+
+fn decode_storage<T: Read>(reader: &mut T) -> Result<BlockStorage> {
+    let format = reader.read_u8()?;
+    let network = 0b0000_0001 & format;
+    assert_eq!(network, 0);
+    let bits_per_block = ((0b1111_1110 & format) as u32) >> 1;
+
+    let mut blocks = Vec::new();
+    const CHUNK_SIZE: usize = 4096;
+    while blocks.len() < CHUNK_SIZE {
+        let w = reader.read_u32::<LittleEndian>()?;
+        unpack_word(w, bits_per_block, &mut blocks);
     }
 
-    impl Iterator for Nibbles {
-        type Item = u8; // Possible values: 0-16
-
-        fn next(&mut self) -> Option<Self::Item> {
-            let (result, next_state) = match self.state {
-                NibbleState::High => (self.high, NibbleState::Low),
-                NibbleState::Low => (self.low, NibbleState::Done),
-                NibbleState::Done => return None,
-            };
-
-            self.state = next_state;
-
-            Some(result)
-        }
+    let mut palette = Vec::new();
+    let num_entries = reader.read_u32::<LittleEndian>()?;
+    for _ in 0..num_entries {
+        let blob = Blob::from_reader(reader)?;
+        let name = match blob["name"] {
+            Value::String(ref s) => s.clone(),
+            _ => panic!("no name field"),
+        };
+        let val = match blob["val"] {
+            Value::Short(i) => i,
+            _ => panic!("no val field"),
+        };
+        palette.push((name, val as u32));
     }
 
-    pub fn nibbles(byte: u8) -> Nibbles {
-        Nibbles {
-            high: byte >> 4,
-            low: byte & 0b1111,
-            state: NibbleState::High,
-        }
+    Ok(BlockStorage { blocks: blocks, palette: palette })
+}
+
+fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u32>) {
+    const WORD_SIZE: u32 = 32;
+
+    let num_blocks = WORD_SIZE / bits_per_block;
+
+    // mask with upper bits_per_block bits set to 1
+    let mask = !((!0u32 << bits_per_block) >> bits_per_block);
+    let shift_correction = WORD_SIZE - bits_per_block;
+
+    for _ in 0..num_blocks {
+        let b = (w & mask) >> shift_correction;
+        output.push(b);
+
+        // shift to next block
+        w <<= bits_per_block;
     }
 }
+
+// fn decode_varint<T: Read>(reader: &mut T) -> Result<i32> {
+//     let mut result = 0i32;
+//     let mut num_read = 0;
+
+//     loop {
+//         let b = reader.read_u8()?;
+//         let value = b & 0b0111_1111;
+//         result |= (value as i32) << (7 * num_read);
+//         num_read += 1;
+
+//         if b & 0b1000_0000 == 0 {
+//             break;
+//         }
+//     }
+
+//     Ok(result)
+// }
 
 trait Encode {
-    fn encode<T: Write>(&self, writer: &mut T);
-}
-
-const CHUNK_SIZE: usize = 4096;
-
-#[derive(Debug, Copy, Clone)]
-pub struct BlockInfo {
-    pub block_id: u8,
-    pub block_data: u8,
+    type Error;
+    fn encode<T: Write>(&self, writer: &mut T) -> ::std::result::Result<(), Self::Error>;
 }
 
 #[derive(Debug, Clone)]
 pub struct Chunk {
-    blocks: Vec<BlockInfo>,
+    block_storages: Vec<BlockStorage>,
 }
 
-impl Chunk {
-    fn deserialize(raw_data: &[u8]) -> Chunk {
-        let without_version = &raw_data[1..];
-        let (block_ids, block_data) = without_version.split_at(CHUNK_SIZE);
-        let block_data_unpacked = block_data.iter().flat_map(|&x| nibbles::nibbles(x));
-
-        let block_info = block_ids
-            .iter()
-            .cloned()
-            .zip(block_data_unpacked)
-            .map(|(id, data)| {
-                BlockInfo {
-                    block_id: id,
-                    block_data: data,
-                }
-            })
-            .collect::<Vec<_>>();
-
-        assert_eq!(block_info.len(), CHUNK_SIZE);
-        Chunk { blocks: block_info }
-    }
+#[derive(Debug, Clone)]
+pub struct BlockStorage {
+    blocks: Vec<u32>,
+    palette: Vec<(String, u32)>,
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -101,55 +120,39 @@ pub struct ChunkPos {
 }
 
 impl Encode for ChunkPos {
-    fn encode<T: Write>(&self, buf: &mut T) {
+    type Error = Error;
+
+    fn encode<T: Write>(&self, buf: &mut T) -> Result<()> {
         const SUBCHUNK_PREFIX: u8 = 47;
-        buf.write_i32::<LittleEndian>(self.x).unwrap();
-        buf.write_i32::<LittleEndian>(self.z).unwrap();
+        buf.write_i32::<LittleEndian>(self.x)?;
+        buf.write_i32::<LittleEndian>(self.z)?;
         if self.dimension != Dimension::Overworld {
-            buf.write_u32::<LittleEndian>(self.dimension as u32)
-                .unwrap();
+            buf.write_u32::<LittleEndian>(self.dimension as u32)?;
         }
-        buf.write_all(&[SUBCHUNK_PREFIX]).unwrap();
-        buf.write_all(&[self.subchunk]).unwrap();
+        buf.write_all(&[SUBCHUNK_PREFIX])?;
+        buf.write_all(&[self.subchunk])?;
+        Ok(())
     }
 }
 
-fn encode_into_buffer<'a, 'b, T: Encode>(value: &'a T, buf: &'b mut [u8]) -> usize {
-    let length = {
+fn encode_into_buffer<'a, 'b, T>(value: &'a T, buf: &'b mut [u8]) -> ::std::result::Result<&'b mut [u8], T::Error>
+where T: Encode {
+    let (length, buf2) = {
         let mut cursor = Cursor::new(buf);
-        value.encode(&mut cursor);
-        cursor.position() as usize
+        value.encode(&mut cursor)?;
+        (cursor.position() as usize, cursor.into_inner())
     };
 
-    length
+    Ok(&mut buf2[..length])
 }
-
-enum
-
-pub struct ChunkItem<'a> {
-    key_slice: &'a [u8],
-    value_slice: &'a [u8],
-}
-
-impl<'a> ChunkItem<'a> {
-    fn
-}
-
 
 pub struct ChunkIterate;
 
-impl ChunkIterate {
-    fn advance(&mut self) {
-        unimplemented!();
-    }
+impl Iterator for ChunkIterate {
+    type Item = Chunk;
 
-    fn get(&self) -> Option<ChunkItem> {
-        unimplemented!();
-    }
-
-    fn next(&mut self) -> Option<ChunkItem> {
-        self.advance();
-        self.get()
+    fn next(&mut self) -> Option<Self::Item> {
+        None
     }
 }
 
@@ -169,14 +172,20 @@ impl World {
 
     pub fn load_chunk(&self, pos: ChunkPos) -> Result<Option<Chunk>> {
         let mut key_buf = [0u8; 32];
-        let key_length = encode_into_buffer(&pos, &mut key_buf[..]);
-        let key_slice = &key_buf[..key_length];
+        let key_slice = encode_into_buffer(&pos, &mut key_buf[..])?;
 
         let read_options = ReadOptions::new();
         let maybe_data = self.database.get_bytes(&read_options, key_slice)?;
 
-        Ok(maybe_data.map(|b| Chunk::deserialize(&b)))
+        if let Some(b) = maybe_data {
+            let mut cursor = Cursor::new(b);
+            let chunk = decode_chunk(&mut cursor)?;
+            Ok(Some(chunk))
+        } else {
+            Ok(None)
+        }
     }
 
-    pub fn iter_chunks(&self) -> ChunkIterate {}
+    // pub fn iter_chunks(&self) -> ChunkIterate {
+    // }
 }
