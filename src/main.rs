@@ -14,8 +14,8 @@ mod error {
 }
 
 fn main() {
-    let path =
-        Path::new("/home/daniel/Shared/iTunes/games/com.mojang/minecraftWorlds/niABAF6qAgA=/db");
+    let path = Path::new("/home/daniel/L6yaXFjeAAA=/db");
+    println!("{:?}", path);
     let mut world = World::open(&path).unwrap();
     let _test_chunk = world
         .load_chunk(SubchunkPos {
