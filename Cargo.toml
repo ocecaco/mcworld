@@ -2,6 +2,7 @@
 name = "mcworld"
 version = "0.1.0"
 authors = ["Daniël Louwrink <daniel.louwrink@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 leveldb = { path = "../leveldb" }

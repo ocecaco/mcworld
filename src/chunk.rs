@@ -1,8 +1,8 @@
 use std::io::{Cursor, Read, Write};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use error::Result;
+use crate::error::Result;
 use nbt::{Blob, Value};
-use table::{BlockId, BlockTable};
+use crate::table::{BlockId, BlockTable};
 
 struct Decoder<'a, 'b, T: 'a> {
     reader: &'a mut T,

@@ -3,11 +3,11 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use leveldb::database::Database;
 use leveldb::options::{Compression, Options, ReadOptions};
 use std::path::Path;
-use chunk::Chunk;
-use encode::{Encode, encode_into_buffer};
-use table::BlockTable;
+use crate::chunk::Chunk;
+use crate::encode::{Encode, encode_into_buffer};
+use crate::table::BlockTable;
 
-use error::*;
+use crate::error::*;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Dimension {
