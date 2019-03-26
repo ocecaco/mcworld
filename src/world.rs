@@ -1,11 +1,11 @@
-use std::io::{Cursor, Read, Write};
+use crate::chunk::Chunk;
+use crate::encode::{encode_into_buffer, Encode};
+use crate::table::BlockTable;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use leveldb::database::Database;
 use leveldb::options::{Compression, Options, ReadOptions};
+use std::io::{Cursor, Read, Write};
 use std::path::Path;
-use crate::chunk::Chunk;
-use crate::encode::{Encode, encode_into_buffer};
-use crate::table::BlockTable;
 
 use crate::error::*;
 
@@ -62,7 +62,10 @@ impl World {
 
         let database = Database::open(path, options)?;
 
-        Ok(World { database: database, table: BlockTable::new() })
+        Ok(World {
+            database,
+            table: BlockTable::new(),
+        })
     }
 
     pub fn load_chunk(&mut self, pos: SubchunkPos) -> Result<Option<Chunk>> {

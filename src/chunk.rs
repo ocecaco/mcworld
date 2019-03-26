@@ -1,8 +1,8 @@
-use std::io::{Cursor, Read, Write};
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use crate::error::Result;
-use nbt::{Blob, Value};
 use crate::table::{BlockId, BlockTable};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use nbt::{Blob, Value};
+use std::io::{Cursor, Read, Write};
 
 struct Decoder<'a, 'b, T: 'a> {
     reader: &'a mut T,
@@ -10,7 +10,9 @@ struct Decoder<'a, 'b, T: 'a> {
 }
 
 impl<'a, 'b, T> Decoder<'a, 'b, T>
-where T: Read {
+where
+    T: Read,
+{
     fn decode_chunk(&mut self) -> Result<Chunk> {
         let version = self.reader.read_u8()?;
         assert_eq!(version, 8);
@@ -22,14 +24,16 @@ where T: Read {
             storages.push(self.decode_storage()?);
         }
 
-        Ok(Chunk { block_storages: storages })
+        Ok(Chunk {
+            block_storages: storages,
+        })
     }
 
     fn decode_storage(&mut self) -> Result<BlockStorage> {
         let format = self.reader.read_u8()?;
         let network = 0b0000_0001 & format;
         assert_eq!(network, 0);
-        let bits_per_block = ((0b1111_1110 & format) as u32) >> 1;
+        let bits_per_block = u32::from(0b1111_1110 & format) >> 1;
 
         let blocks = self.decode_blocks(bits_per_block)?;
         let palette = self.decode_palette()?;
@@ -59,10 +63,7 @@ where T: Read {
         for _ in 0..num_entries {
             let (name, val) = self.decode_palette_entry()?;
             let id = self.table.get_id(name);
-            palette.push(BlockInfo {
-                id: id,
-                val: val,
-            });
+            palette.push(BlockInfo { id, val });
         }
 
         Ok(palette)
@@ -115,8 +116,8 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn deserialize<T: Read>(source: &mut T, table: &mut BlockTable) -> Result<Chunk> {
-        let mut decoder = Decoder { reader: source, table: table };
+    pub fn deserialize<T: Read>(reader: &mut T, table: &mut BlockTable) -> Result<Chunk> {
+        let mut decoder = Decoder { reader, table };
         decoder.decode_chunk()
     }
 }
