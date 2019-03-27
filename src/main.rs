@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::world::{Dimension, SubchunkPos, World};
 use std::path::Path;
 
@@ -24,6 +25,12 @@ fn main() {
         })
         .unwrap()
         .unwrap();
+
+    let chunk_list = world.list_chunks().unwrap();
+
+    for c in chunk_list {
+        println!("{:?}", c);
+    }
 
     println!("Great success!");
 }
