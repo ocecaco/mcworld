@@ -1,4 +1,5 @@
 use crate::error::Result;
+use crate::table::BlockDescription;
 use byteorder::{LittleEndian, ReadBytesExt};
 use nbt::{Blob, Value};
 use std::io::Read;
@@ -11,7 +12,7 @@ impl<'a, T> Decoder<'a, T>
 where
     T: Read,
 {
-    fn decode_chunk(&mut self) -> Result<RawChunk> {
+    fn decode_chunk(&mut self) -> Result<Subchunk> {
         let version = self.reader.read_u8()?;
         assert_eq!(version, 8);
 
@@ -22,7 +23,7 @@ where
             storages.push(self.decode_storage()?);
         }
 
-        Ok(RawChunk {
+        Ok(Subchunk {
             block_storages: storages,
         })
     }
@@ -52,7 +53,7 @@ where
         Ok(blocks)
     }
 
-    fn decode_palette(&mut self) -> Result<Vec<(String, u32)>> {
+    fn decode_palette(&mut self) -> Result<Vec<BlockDescription>> {
         let mut palette = Vec::new();
         let num_entries = self.reader.read_u32::<LittleEndian>()?;
 
@@ -64,7 +65,7 @@ where
         Ok(palette)
     }
 
-    fn decode_palette_entry(&mut self) -> Result<(String, u32)> {
+    fn decode_palette_entry(&mut self) -> Result<BlockDescription> {
         let blob = Blob::from_reader(self.reader)?;
         let name = match blob["name"] {
             Value::String(ref s) => s.clone(),
@@ -74,7 +75,10 @@ where
             Value::Short(i) => i,
             _ => panic!("no val field"),
         };
-        Ok((name, val as u32))
+        Ok(BlockDescription {
+            name,
+            val: val as u32,
+        })
     }
 }
 
@@ -97,12 +101,12 @@ fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u16>) {
 }
 
 #[derive(Debug, Clone)]
-pub struct RawChunk {
+pub struct Subchunk {
     pub block_storages: Vec<RawBlockStorage>,
 }
 
-impl RawChunk {
-    pub fn deserialize<T: Read>(reader: &mut T) -> Result<RawChunk> {
+impl Subchunk {
+    pub fn deserialize<T: Read>(reader: &mut T) -> Result<Subchunk> {
         let mut decoder = Decoder { reader };
         decoder.decode_chunk()
     }
@@ -111,5 +115,5 @@ impl RawChunk {
 #[derive(Debug, Clone)]
 pub struct RawBlockStorage {
     pub blocks: Vec<u16>,
-    pub palette: Vec<(String, u32)>,
+    pub palette: Vec<BlockDescription>,
 }

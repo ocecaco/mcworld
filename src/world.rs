@@ -1,173 +1,224 @@
-use crate::chunk::RawChunk;
-use crate::encode::{encode_into_buffer, Encode};
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use leveldb::database::iterator::DatabaseIterator;
-use leveldb::database::Database;
-use leveldb::options::{Compression, Options, ReadOptions};
-use std::io::{Cursor, Read, Write};
+use std::collections::HashMap;
 use std::path::Path;
+
+use crate::rawchunk::RawBlockStorage;
+use crate::rawworld::{Dimension, RawWorld, SubchunkPos};
+use crate::table::{BlockId, BlockTable, AIR, NOT_PRESENT};
 
 use crate::error::*;
 
-const SUBCHUNK_KEY_LEN_OVERWORLD: usize = 10;
-const SUBCHUNK_KEY_LEN_OTHER: usize = 14;
-const SUBCHUNK_PREFIX: u8 = 47;
+const NUM_SUBCHUNKS: usize = 16;
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Dimension {
-    Overworld = 0,
-    Nether = 1,
-    End = 2,
+pub struct World {
+    raw_world: RawWorld,
+    pub global_palette: BlockTable,
+    chunk_cache: HashMap<ChunkPos, Option<Chunk>>,
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct SubchunkPos {
+pub struct ChunkPos {
     pub x: i32,
     pub z: i32,
-    pub subchunk: u8,
     pub dimension: Dimension,
 }
 
-impl Encode for SubchunkPos {
-    type Error = Error;
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct WorldPos {
+    pub x: i32,
+    pub y: u8,
+    pub z: i32,
+    pub dimension: Dimension,
+}
 
-    fn encode<T: Write>(&self, buf: &mut T) -> Result<()> {
-        buf.write_i32::<LittleEndian>(self.x)?;
-        buf.write_i32::<LittleEndian>(self.z)?;
-        if self.dimension != Dimension::Overworld {
-            buf.write_u32::<LittleEndian>(self.dimension as u32)?;
+impl WorldPos {
+    fn to_chunk_pos(&self) -> ChunkPos {
+        ChunkPos {
+            x: flooring_divide(self.x, 16),
+            z: flooring_divide(self.z, 16),
+            dimension: self.dimension,
         }
-        buf.write_all(&[SUBCHUNK_PREFIX])?;
-        buf.write_all(&[self.subchunk])?;
-        Ok(())
     }
 }
 
-pub struct RawWorld {
-    database: Database,
+impl ChunkPos {
+    fn subchunk_pos(&self, subchunk: u8) -> SubchunkPos {
+        SubchunkPos {
+            x: self.x,
+            z: self.z,
+            subchunk,
+            dimension: self.dimension,
+        }
+    }
 }
 
-impl RawWorld {
-    pub fn open(path: &Path) -> Result<RawWorld> {
-        let mut options = Options::new();
-        options.compression = Compression::ZlibRaw;
+// uses indices into table stored in the World instead of a separate palette for
+// each subchunk
+struct ConvertedSubchunk {
+    data1: Vec<BlockId>,
+    data2: Option<Vec<BlockId>>,
+}
 
-        let database = Database::open(path, options)?;
+struct Chunk {
+    // subchunks might be missing, which means they are filled with air. The
+    // length of this vector should always be exactly 16, since that is the
+    // number of subchunks per chunk.
+    subchunks: Vec<Option<ConvertedSubchunk>>,
+}
 
-        Ok(RawWorld { database })
+fn flooring_divide(n: i32, k: u32) -> i32 {
+    let k = k as i32;
+    let div = n / k;
+    let rem = n - div * k;
+
+    // no need for fancy rounding if the remainder is 0
+    if rem == 0 {
+        return div;
     }
 
-    pub fn load_chunk(&mut self, pos: SubchunkPos) -> Result<Option<RawChunk>> {
-        let mut key_buf = [0u8; 32];
-        let key_slice = encode_into_buffer(&pos, &mut key_buf[..])?;
+    // otherwise fix up the negative numbers to make the rounding go to negative
+    //  infinity instead of zero
+    if n < 0 {
+        div - 1
+    } else {
+        div
+    }
+}
 
-        let read_options = ReadOptions::new();
-        let maybe_data = self.database.get_bytes(&read_options, key_slice)?;
+impl Chunk {
+    fn get_block(&self, w: &WorldPos) -> (BlockId, BlockId) {
+        let subchunk_offset = w.y / 16;
+        println!("subchunk offset: {:?}", subchunk_offset);
+        let inner_y = w.y % 16;
+        let inner_x = w.x - flooring_divide(w.x, 16) * 16;
+        println!("w.z: {}", w.z);
+        let inner_z = w.z - flooring_divide(w.z, 16) * 16;
 
-        if let Some(b) = maybe_data {
-            let mut cursor = Cursor::new(b);
-            let chunk = RawChunk::deserialize(&mut cursor)?;
-            Ok(Some(chunk))
+        assert!(inner_x < 16);
+        assert!(inner_y < 16);
+        assert!(inner_z < 16);
+        assert!(subchunk_offset < 16);
+
+        // TODO: Correct order?
+        let final_offset = (16 * 16 * inner_x + 16 * inner_z + inner_y as i32) as usize;
+
+        let maybe_subchunk = &self.subchunks[subchunk_offset as usize];
+        match maybe_subchunk {
+            Some(subchunk) => {
+                let block1 = subchunk.data1[final_offset];
+                let block2 = if let Some(data2) = &subchunk.data2 {
+                    data2[final_offset]
+                } else {
+                    NOT_PRESENT
+                };
+                (block1, block2)
+            }
+            None => (AIR, NOT_PRESENT),
+        }
+    }
+}
+
+impl World {
+    pub fn open(path: &Path) -> Result<World> {
+        let raw_world = RawWorld::open(path)?;
+        Ok(World {
+            raw_world,
+            global_palette: BlockTable::new(),
+            chunk_cache: HashMap::new(),
+        })
+    }
+
+    pub fn iter_chunks<'a>(&'a mut self) -> impl Iterator<Item = Result<ChunkPos>> + 'a {
+        // only include chunks instead of subchunk granularity, and keep errors
+        self.raw_world.iter_chunks().filter_map(|c| match c {
+            Ok(pos) => {
+                if pos.subchunk == 0 {
+                    Some(Ok(ChunkPos {
+                        x: pos.x,
+                        z: pos.z,
+                        dimension: pos.dimension,
+                    }))
+                } else {
+                    None
+                }
+            }
+            Err(e) => Some(Err(e)),
+        })
+    }
+
+    fn translate_block_storage(&mut self, storage: &RawBlockStorage) -> Vec<BlockId> {
+        storage
+            .blocks
+            .iter()
+            .map(|b| self.global_palette.get_id(&storage.palette[*b as usize]))
+            .collect()
+    }
+
+    fn load_subchunk(&mut self, pos: &SubchunkPos) -> Result<Option<ConvertedSubchunk>> {
+        let maybe_sc = self.raw_world.load_chunk(pos)?;
+
+        match maybe_sc {
+            Some(sc) => {
+                let count = sc.block_storages.len();
+                assert!(
+                    count == 1 || count == 2,
+                    "should have at one or two BlockStorages"
+                );
+
+                let bs1 = self.translate_block_storage(&sc.block_storages[0]);
+
+                // second blockstorage might be missing
+                let bs2 = sc
+                    .block_storages
+                    .get(1)
+                    .map(|bs| self.translate_block_storage(&bs));
+
+                Ok(Some(ConvertedSubchunk {
+                    data1: bs1,
+                    data2: bs2,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn load_chunk(&mut self, pos: &ChunkPos) -> Result<Option<Chunk>> {
+        // If the bottom-most subchunk is not there, then the chunk has not been
+        // stored in the world. Hence the bottom-most subchunk must be present.
+        let bottom_subchunk = self.load_subchunk(&pos.subchunk_pos(0))?;
+
+        if bottom_subchunk.is_some() {
+            let mut subchunks = Vec::with_capacity(NUM_SUBCHUNKS);
+            subchunks.push(bottom_subchunk);
+
+            // load the other subchunks as well
+            for i in 1..NUM_SUBCHUNKS {
+                subchunks.push(self.load_subchunk(&pos.subchunk_pos(i as u8))?);
+            }
+
+            Ok(Some(Chunk { subchunks }))
         } else {
+            // chunk is not present
             Ok(None)
         }
     }
 
-    pub fn iter_chunks(&mut self) -> SubchunkIterator {
-        let read_options = ReadOptions::new();
-        let dbiter = self.database.iter(&read_options);
-        let iter = SubchunkIterator {
-            iter: dbiter,
-            done: false,
-            started: false,
+    pub fn get_block(&mut self, pos: &WorldPos) -> Result<(BlockId, BlockId)> {
+        let chunk_pos = pos.to_chunk_pos();
+        println!("chunk pos: {:?}", chunk_pos);
+
+        // try to load chunk from cache, and otherwise load from disk and put it
+        // in the cache
+        let maybe_chunk = if let Some(c) = self.chunk_cache.get(&chunk_pos) {
+            c
+        } else {
+            let chunk = self.load_chunk(&chunk_pos)?;
+            self.chunk_cache.insert(chunk_pos.clone(), chunk);
+            &self.chunk_cache[&chunk_pos]
         };
-        iter
-    }
-}
 
-pub struct SubchunkIterator<'a> {
-    iter: DatabaseIterator<'a>,
-    done: bool,
-    started: bool,
-}
-
-impl<'a> Iterator for SubchunkIterator<'a> {
-    type Item = Result<SubchunkPos>;
-
-    fn next(&mut self) -> Option<Result<SubchunkPos>> {
-        if self.done {
-            return None;
-        }
-
-        if !self.started {
-            self.iter.seek_to_first();
-            self.started = true;
-        }
-
-        loop {
-            if !self.iter.valid() {
-                self.done = true;
-                return None;
-            }
-
-            let key_slice = self.iter.key();
-
-            // check if the one-to-last element of the key contains the subchunk
-            // prefix, otherwise it does not contain block data
-            let result = if key_slice[key_slice.len() - 2] == SUBCHUNK_PREFIX {
-                if key_slice.len() == SUBCHUNK_KEY_LEN_OVERWORLD {
-                    Some(decode_pos(key_slice, true))
-                } else if key_slice.len() == SUBCHUNK_KEY_LEN_OTHER {
-                    Some(decode_pos(key_slice, false))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            if let Some(res) = result {
-                if res.is_err() {
-                    self.done = true;
-                }
-
-                self.iter.next();
-                return Some(res);
-            }
-
-            // skip keys which do not represent subchunk block data
-            self.iter.next();
+        match maybe_chunk {
+            Some(chunk) => Ok(chunk.get_block(pos)),
+            None => Ok((NOT_PRESENT, NOT_PRESENT)),
         }
     }
-}
-
-fn decode_pos(key: &[u8], overworld: bool) -> Result<SubchunkPos> {
-    let mut cursor = Cursor::new(key);
-    let x = cursor.read_i32::<LittleEndian>()?;
-    let z = cursor.read_i32::<LittleEndian>()?;
-    let dimension = if !overworld {
-        let dim = cursor.read_u32::<LittleEndian>()?;
-        match dim {
-            1 => Dimension::Nether,
-            2 => Dimension::End,
-            _ => panic!("unexpected dimension {} in decode_pos", dim),
-        }
-    } else {
-        Dimension::Overworld
-    };
-
-    // read subchunk prefix and subchunk height, the prefix is unused and we
-    // only look at the subchunk y position
-    let mut buf = [0u8; 2];
-    cursor.read_exact(&mut buf)?;
-
-    assert_eq!(buf[0], SUBCHUNK_PREFIX, "invalid subchunk prefix");
-    let subchunk = buf[1];
-
-    Ok(SubchunkPos {
-        x,
-        z,
-        subchunk,
-        dimension,
-    })
 }
