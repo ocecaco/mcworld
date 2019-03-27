@@ -1,6 +1,7 @@
 use crate::chunk::Chunk;
 use crate::encode::{encode_into_buffer, Encode};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use leveldb::database::iterator::DatabaseIterator;
 use leveldb::database::Database;
 use leveldb::options::{Compression, Options, ReadOptions};
 use std::io::{Cursor, Read, Write};
@@ -72,27 +73,71 @@ impl World {
         }
     }
 
-    pub fn list_chunks(&mut self) -> Result<Vec<SubchunkPos>> {
-        let mut result = Vec::new();
+    pub fn iter_chunks(&mut self) -> SubchunkIterator {
         let read_options = ReadOptions::new();
-        let mut iter = self.database.iter(&read_options);
-        iter.seek_to_first();
-        while iter.valid() {
-            let key_slice = iter.key();
+        let dbiter = self.database.iter(&read_options);
+        let iter = SubchunkIterator {
+            iter: dbiter,
+            done: false,
+            started: false,
+        };
+        iter
+    }
+}
+
+pub struct SubchunkIterator<'a> {
+    iter: DatabaseIterator<'a>,
+    done: bool,
+    started: bool,
+}
+
+impl<'a> Iterator for SubchunkIterator<'a> {
+    type Item = Result<SubchunkPos>;
+
+    fn next(&mut self) -> Option<Result<SubchunkPos>> {
+        if self.done {
+            return None;
+        }
+
+        if !self.started {
+            self.iter.seek_to_first();
+            self.started = true;
+        }
+
+        loop {
+            if !self.iter.valid() {
+                self.done = true;
+                return None;
+            }
+
+            let key_slice = self.iter.key();
 
             // check if the one-to-last element of the key contains the subchunk
             // prefix, otherwise it does not contain the block data
-            if key_slice[key_slice.len() - 2] == SUBCHUNK_PREFIX {
+            let result = if key_slice[key_slice.len() - 2] == SUBCHUNK_PREFIX {
                 if key_slice.len() == SUBCHUNK_KEY_LEN_OVERWORLD {
-                    result.push(decode_pos(key_slice, true)?);
+                    Some(decode_pos(key_slice, true))
                 } else if key_slice.len() == SUBCHUNK_KEY_LEN_OTHER {
-                    result.push(decode_pos(key_slice, false)?);
+                    Some(decode_pos(key_slice, false))
+                } else {
+                    None
                 }
+            } else {
+                None
+            };
+
+            if let Some(res) = result {
+                if res.is_err() {
+                    self.done = true;
+                }
+
+                self.iter.next();
+                return Some(res);
             }
 
-            iter.next();
+            // skip keys which do not represent subchunk block data
+            self.iter.next();
         }
-        Ok(result)
     }
 }
 

@@ -26,10 +26,10 @@ fn main() {
         .unwrap()
         .unwrap();
 
-    let chunk_list = world.list_chunks().unwrap();
+    let chunk_list = world.iter_chunks();
 
     for c in chunk_list {
-        println!("{:?}", c);
+        println!("{:?}", c.unwrap());
     }
 
     println!("Great success!");
