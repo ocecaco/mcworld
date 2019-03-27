@@ -10,7 +10,7 @@ use crate::error::*;
 const NUM_SUBCHUNKS: usize = 16;
 
 pub struct World {
-    raw_world: RawWorld,
+    pub raw_world: RawWorld,
     pub global_palette: BlockTable,
     chunk_cache: HashMap<ChunkPos, Option<Chunk>>,
 }
@@ -88,14 +88,16 @@ impl Chunk {
     fn get_block(&self, w: &WorldPos) -> (BlockId, BlockId) {
         let subchunk_offset = w.y / 16;
         println!("subchunk offset: {:?}", subchunk_offset);
-        let inner_y = w.y % 16;
+        // Not really sure why this formula is required... The heights don't
+        // seem to be stored from y = 0 to y = 15 but in a different order.
+        let inner_y = (7 - w.y % 16) % 16;
         let inner_x = w.x - flooring_divide(w.x, 16) * 16;
         println!("w.z: {}", w.z);
         let inner_z = w.z - flooring_divide(w.z, 16) * 16;
 
-        assert!(inner_x < 16);
+        assert!(inner_x >= 0 && inner_x < 16);
         assert!(inner_y < 16);
-        assert!(inner_z < 16);
+        assert!(inner_z >= 0 && inner_z < 16);
         assert!(subchunk_offset < 16);
 
         // TODO: Correct order?
@@ -155,6 +157,8 @@ impl World {
 
     fn load_subchunk(&mut self, pos: &SubchunkPos) -> Result<Option<ConvertedSubchunk>> {
         let maybe_sc = self.raw_world.load_chunk(pos)?;
+
+        println!("subchunk pos: {:?}", pos);
 
         match maybe_sc {
             Some(sc) => {

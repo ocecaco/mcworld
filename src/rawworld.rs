@@ -65,8 +65,13 @@ impl RawWorld {
         let maybe_data = self.database.get_bytes(&read_options, key_slice)?;
 
         if let Some(b) = maybe_data {
+            let len = b.len();
             let mut cursor = Cursor::new(b);
             let chunk = Subchunk::deserialize(&mut cursor)?;
+
+            // make sure we consume ALL of the data
+            assert_eq!(cursor.position() as usize, len);
+
             Ok(Some(chunk))
         } else {
             Ok(None)
