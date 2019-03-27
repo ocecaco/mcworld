@@ -1,10 +1,9 @@
 use crate::chunk::Chunk;
 use crate::encode::{encode_into_buffer, Encode};
-use crate::table::BlockTable;
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, WriteBytesExt};
 use leveldb::database::Database;
 use leveldb::options::{Compression, Options, ReadOptions};
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Write};
 use std::path::Path;
 
 use crate::error::*;
@@ -37,16 +36,6 @@ impl Encode for SubchunkPos {
         buf.write_all(&[SUBCHUNK_PREFIX])?;
         buf.write_all(&[self.subchunk])?;
         Ok(())
-    }
-}
-
-pub struct ChunkIterate;
-
-impl Iterator for ChunkIterate {
-    type Item = SubchunkPos;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        None
     }
 }
 

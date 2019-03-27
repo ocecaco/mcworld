@@ -1,8 +1,8 @@
 use crate::error::Result;
-use crate::table::{BlockId, BlockTable};
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use crate::table::BlockId;
+use byteorder::{LittleEndian, ReadBytesExt};
 use nbt::{Blob, Value};
-use std::io::{Cursor, Read, Write};
+use std::io::Read;
 
 struct Decoder<'a, T: 'a> {
     reader: &'a mut T,
@@ -40,7 +40,7 @@ where
         Ok(BlockStorage { blocks, palette })
     }
 
-    fn decode_blocks(&mut self, bits_per_block: u32) -> Result<Vec<u32>> {
+    fn decode_blocks(&mut self, bits_per_block: u32) -> Result<Vec<u16>> {
         const CHUNK_SIZE: usize = 4096;
 
         let mut blocks = Vec::new();
@@ -79,7 +79,7 @@ where
     }
 }
 
-fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u32>) {
+fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u16>) {
     const WORD_SIZE: u32 = 32;
 
     let num_blocks = WORD_SIZE / bits_per_block;
@@ -90,21 +90,12 @@ fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u32>) {
 
     for _ in 0..num_blocks {
         let b = (w & mask) >> shift_correction;
-        output.push(b);
+        output.push(b as u16);
 
         // shift to next block
         w <<= bits_per_block;
     }
 }
-
-// #[derive(Debug, Clone)]
-// struct Encoder<'a, T: 'a> {
-//     writer: &'a mut T,
-// }
-
-// impl<'a, T: Write>  for  {
-
-// }
 
 #[derive(Debug, Clone)]
 pub struct Chunk {
@@ -126,6 +117,6 @@ pub struct BlockInfo {
 
 #[derive(Debug, Clone)]
 pub struct BlockStorage {
-    blocks: Vec<u32>,
+    blocks: Vec<u16>,
     palette: Vec<(String, u32)>,
 }

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 use crate::world::{Dimension, SubchunkPos, World};
 use std::path::Path;
 
