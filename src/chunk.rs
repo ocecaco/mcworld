@@ -1,5 +1,4 @@
 use crate::error::Result;
-use crate::table::BlockId;
 use byteorder::{LittleEndian, ReadBytesExt};
 use nbt::{Blob, Value};
 use std::io::Read;
@@ -107,12 +106,6 @@ impl Chunk {
         let mut decoder = Decoder { reader };
         decoder.decode_chunk()
     }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct BlockInfo {
-    id: BlockId,
-    val: u32,
 }
 
 #[derive(Debug, Clone)]
