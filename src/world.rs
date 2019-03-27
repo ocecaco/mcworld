@@ -52,7 +52,6 @@ impl Iterator for ChunkIterate {
 
 pub struct World {
     database: Database,
-    table: BlockTable,
 }
 
 impl World {
@@ -62,10 +61,7 @@ impl World {
 
         let database = Database::open(path, options)?;
 
-        Ok(World {
-            database,
-            table: BlockTable::new(),
-        })
+        Ok(World { database })
     }
 
     pub fn load_chunk(&mut self, pos: SubchunkPos) -> Result<Option<Chunk>> {
@@ -77,7 +73,7 @@ impl World {
 
         if let Some(b) = maybe_data {
             let mut cursor = Cursor::new(b);
-            let chunk = Chunk::deserialize(&mut cursor, &mut self.table)?;
+            let chunk = Chunk::deserialize(&mut cursor)?;
             Ok(Some(chunk))
         } else {
             Ok(None)

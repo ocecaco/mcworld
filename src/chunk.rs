@@ -4,12 +4,11 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use nbt::{Blob, Value};
 use std::io::{Cursor, Read, Write};
 
-struct Decoder<'a, 'b, T: 'a> {
+struct Decoder<'a, T: 'a> {
     reader: &'a mut T,
-    table: &'b mut BlockTable,
 }
 
-impl<'a, 'b, T> Decoder<'a, 'b, T>
+impl<'a, T> Decoder<'a, T>
 where
     T: Read,
 {
@@ -38,9 +37,7 @@ where
         let blocks = self.decode_blocks(bits_per_block)?;
         let palette = self.decode_palette()?;
 
-        let translated = blocks.iter().map(|i| palette[*i as usize]).collect();
-
-        Ok(BlockStorage { blocks: translated })
+        Ok(BlockStorage { blocks, palette })
     }
 
     fn decode_blocks(&mut self, bits_per_block: u32) -> Result<Vec<u32>> {
@@ -56,14 +53,13 @@ where
         Ok(blocks)
     }
 
-    fn decode_palette(&mut self) -> Result<Vec<BlockInfo>> {
+    fn decode_palette(&mut self) -> Result<Vec<(String, u32)>> {
         let mut palette = Vec::new();
         let num_entries = self.reader.read_u32::<LittleEndian>()?;
 
         for _ in 0..num_entries {
-            let (name, val) = self.decode_palette_entry()?;
-            let id = self.table.get_id(name);
-            palette.push(BlockInfo { id, val });
+            let entry = self.decode_palette_entry()?;
+            palette.push(entry);
         }
 
         Ok(palette)
@@ -116,8 +112,8 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn deserialize<T: Read>(reader: &mut T, table: &mut BlockTable) -> Result<Chunk> {
-        let mut decoder = Decoder { reader, table };
+    pub fn deserialize<T: Read>(reader: &mut T) -> Result<Chunk> {
+        let mut decoder = Decoder { reader };
         decoder.decode_chunk()
     }
 }
@@ -130,5 +126,6 @@ pub struct BlockInfo {
 
 #[derive(Debug, Clone)]
 pub struct BlockStorage {
-    blocks: Vec<BlockInfo>,
+    blocks: Vec<u32>,
+    palette: Vec<(String, u32)>,
 }
