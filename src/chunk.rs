@@ -11,7 +11,7 @@ impl<'a, T> Decoder<'a, T>
 where
     T: Read,
 {
-    fn decode_chunk(&mut self) -> Result<Chunk> {
+    fn decode_chunk(&mut self) -> Result<RawChunk> {
         let version = self.reader.read_u8()?;
         assert_eq!(version, 8);
 
@@ -22,12 +22,12 @@ where
             storages.push(self.decode_storage()?);
         }
 
-        Ok(Chunk {
+        Ok(RawChunk {
             block_storages: storages,
         })
     }
 
-    fn decode_storage(&mut self) -> Result<BlockStorage> {
+    fn decode_storage(&mut self) -> Result<RawBlockStorage> {
         let format = self.reader.read_u8()?;
         let network = 0b0000_0001 & format;
         assert_eq!(network, 0);
@@ -36,7 +36,7 @@ where
         let blocks = self.decode_blocks(bits_per_block)?;
         let palette = self.decode_palette()?;
 
-        Ok(BlockStorage { blocks, palette })
+        Ok(RawBlockStorage { blocks, palette })
     }
 
     fn decode_blocks(&mut self, bits_per_block: u32) -> Result<Vec<u16>> {
@@ -97,19 +97,19 @@ fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u16>) {
 }
 
 #[derive(Debug, Clone)]
-pub struct Chunk {
-    block_storages: Vec<BlockStorage>,
+pub struct RawChunk {
+    pub block_storages: Vec<RawBlockStorage>,
 }
 
-impl Chunk {
-    pub fn deserialize<T: Read>(reader: &mut T) -> Result<Chunk> {
+impl RawChunk {
+    pub fn deserialize<T: Read>(reader: &mut T) -> Result<RawChunk> {
         let mut decoder = Decoder { reader };
         decoder.decode_chunk()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct BlockStorage {
-    blocks: Vec<u16>,
-    palette: Vec<(String, u32)>,
+pub struct RawBlockStorage {
+    pub blocks: Vec<u16>,
+    pub palette: Vec<(String, u32)>,
 }

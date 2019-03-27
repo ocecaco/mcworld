@@ -1,4 +1,4 @@
-use crate::chunk::Chunk;
+use crate::chunk::RawChunk;
 use crate::encode::{encode_into_buffer, Encode};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use leveldb::database::iterator::DatabaseIterator;
@@ -43,21 +43,21 @@ impl Encode for SubchunkPos {
     }
 }
 
-pub struct World {
+pub struct RawWorld {
     database: Database,
 }
 
-impl World {
-    pub fn open(path: &Path) -> Result<World> {
+impl RawWorld {
+    pub fn open(path: &Path) -> Result<RawWorld> {
         let mut options = Options::new();
         options.compression = Compression::ZlibRaw;
 
         let database = Database::open(path, options)?;
 
-        Ok(World { database })
+        Ok(RawWorld { database })
     }
 
-    pub fn load_chunk(&mut self, pos: SubchunkPos) -> Result<Option<Chunk>> {
+    pub fn load_chunk(&mut self, pos: SubchunkPos) -> Result<Option<RawChunk>> {
         let mut key_buf = [0u8; 32];
         let key_slice = encode_into_buffer(&pos, &mut key_buf[..])?;
 
@@ -66,7 +66,7 @@ impl World {
 
         if let Some(b) = maybe_data {
             let mut cursor = Cursor::new(b);
-            let chunk = Chunk::deserialize(&mut cursor)?;
+            let chunk = RawChunk::deserialize(&mut cursor)?;
             Ok(Some(chunk))
         } else {
             Ok(None)
@@ -113,7 +113,7 @@ impl<'a> Iterator for SubchunkIterator<'a> {
             let key_slice = self.iter.key();
 
             // check if the one-to-last element of the key contains the subchunk
-            // prefix, otherwise it does not contain the block data
+            // prefix, otherwise it does not contain block data
             let result = if key_slice[key_slice.len() - 2] == SUBCHUNK_PREFIX {
                 if key_slice.len() == SUBCHUNK_KEY_LEN_OVERWORLD {
                     Some(decode_pos(key_slice, true))

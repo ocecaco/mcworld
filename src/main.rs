@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::world::{Dimension, SubchunkPos, World};
+use crate::world::{Dimension, RawWorld, SubchunkPos};
 use std::path::Path;
 
 mod chunk;
@@ -15,7 +15,7 @@ mod error {
 fn main() {
     let path = Path::new("/home/daniel/L6yaXFjeAAA=/db");
     println!("{:?}", path);
-    let mut world = World::open(&path).unwrap();
+    let mut world = RawWorld::open(&path).unwrap();
     let _test_chunk = world
         .load_chunk(SubchunkPos {
             x: 0,
