@@ -90,18 +90,18 @@ impl Chunk {
         println!("subchunk offset: {:?}", subchunk_offset);
         // Not really sure why this formula is required... The heights don't
         // seem to be stored from y = 0 to y = 15 but in a different order.
-        let inner_y = (7 - w.y % 16) % 16;
+        // the order is 7 6 5 4 3 2 1 0 15 14 13 12 11 10 9 8
+        let inner_y = (23 - w.y as i32 % 16) % 16;
         let inner_x = w.x - flooring_divide(w.x, 16) * 16;
-        println!("w.z: {}", w.z);
         let inner_z = w.z - flooring_divide(w.z, 16) * 16;
 
         assert!(inner_x >= 0 && inner_x < 16);
-        assert!(inner_y < 16);
+        assert!(inner_y >= 0 && inner_y < 16);
         assert!(inner_z >= 0 && inner_z < 16);
         assert!(subchunk_offset < 16);
 
         // TODO: Correct order?
-        let final_offset = (16 * 16 * inner_x + 16 * inner_z + inner_y as i32) as usize;
+        let final_offset = (16 * 16 * inner_x + 16 * inner_z + inner_y) as usize;
 
         let maybe_subchunk = &self.subchunks[subchunk_offset as usize];
         match maybe_subchunk {
