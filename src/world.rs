@@ -87,7 +87,6 @@ fn flooring_divide(n: i32, k: u32) -> i32 {
 impl Chunk {
     fn get_block(&self, w: &WorldPos) -> (BlockId, BlockId) {
         let subchunk_offset = w.y / 16;
-        println!("subchunk offset: {:?}", subchunk_offset);
         // Not really sure why this formula is required... The heights don't
         // seem to be stored from y = 0 to y = 15 but in a different order.
         // the order is 7 6 5 4 3 2 1 0 15 14 13 12 11 10 9 8
@@ -158,14 +157,12 @@ impl World {
     fn load_subchunk(&mut self, pos: &SubchunkPos) -> Result<Option<ConvertedSubchunk>> {
         let maybe_sc = self.raw_world.load_chunk(pos)?;
 
-        println!("subchunk pos: {:?}", pos);
-
         match maybe_sc {
             Some(sc) => {
                 let count = sc.block_storages.len();
                 assert!(
                     count == 1 || count == 2,
-                    "should have at one or two BlockStorages"
+                    "should have one or two BlockStorages"
                 );
 
                 let bs1 = self.translate_block_storage(&sc.block_storages[0]);
@@ -208,7 +205,6 @@ impl World {
 
     pub fn get_block(&mut self, pos: &WorldPos) -> Result<(BlockId, BlockId)> {
         let chunk_pos = pos.to_chunk_pos();
-        println!("chunk pos: {:?}", chunk_pos);
 
         // try to load chunk from cache, and otherwise load from disk and put it
         // in the cache

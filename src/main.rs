@@ -1,6 +1,8 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
 use crate::rawworld::Dimension;
 use crate::rawworld::SubchunkPos;
+use crate::table::NOT_PRESENT;
 use crate::world::{World, WorldPos};
 use std::path::Path;
 
@@ -19,79 +21,30 @@ fn main() {
     let path = Path::new("/home/daniel/L6yaXFjeAAA=/db");
     println!("{:?}", path);
     let mut world = World::open(&path).unwrap();
-    // let _test_chunk = world
-    //     .load_chunk(SubchunkPos {
-    //         x: 0,
-    //         z: 0,
-    //         subchunk: 4,
-    //         dimension: Dimension::Overworld,
-    //     })
-    //     .unwrap()
-    //     .unwrap();
 
-    // let chunk_list = world.iter_chunks();
+    let chunk_positions: Vec<_> = world.iter_chunks().collect();
 
-    // for c in chunk_list {
-    //     println!("{:?}", c.unwrap());
-    // }
+    for pos in chunk_positions {
+        let pos = pos.unwrap();
 
-    let positions: Vec<_> = world.raw_world.iter_chunks().collect();
+        if pos.dimension != Dimension::Overworld {
+            continue;
+        }
 
-    for sc in positions {
-        let sc = sc.unwrap();
-
-        let subchunk = world.raw_world.load_chunk(&sc).unwrap().unwrap();
-
-        if let Some(magma_id) = subchunk.block_storages[0]
-            .palette
-            .iter()
-            .position(|d| d.name.contains("redstone_block"))
-        {
-            if sc.dimension == Dimension::Overworld {
-                println!("sc: {:?}", sc);
-                let block_positions = subchunk.block_storages[0]
-                    .blocks
-                    .iter()
-                    .cloned()
-                    .enumerate()
-                    .filter(|(i, b)| *b == magma_id as u16);
-                for (i, _) in block_positions {
-                    println!("found at: {}", i);
+        for dy in 0..=255 {
+            for dz in 0..16 {
+                for dx in 0..16 {
+                    let world_pos = WorldPos {
+                        x: 16 * pos.x + dx,
+                        y: dy,
+                        z: 16 * pos.z + dz,
+                        dimension: Dimension::Overworld,
+                    };
+                    world.get_block(&world_pos).unwrap();
                 }
-                println!(
-                    "name: {}",
-                    subchunk.block_storages[0].palette[magma_id].name
-                );
-                println!("val: {}", subchunk.block_storages[0].palette[magma_id].val);
             }
         }
     }
-
-    // println!(
-    //     "{:?}",
-    //     test_chunk.block_storages[0]
-    //         .blocks
-    //         .iter()
-    //         .position(|&b| b == 7)
-    // );
-    // println!("{:?}", test_chunk.block_storages[0].palette.len());
-
-    // for x in 47..=67 {
-    //     for y in 60..=80 {
-    //         for z in -78..=-58 {
-    //             let (block1, block2) = world
-    //                 .get_block(&WorldPos {
-    //                     x: x,
-    //                     y: y,
-    //                     z: z,
-    //                     dimension: Dimension::Overworld,
-    //                 })
-    //                 .unwrap();
-
-    //             println!("{:?}", world.global_palette.get_description(block1));
-    //         }
-    //     }
-    // }
 
     println!("Great success!");
 }
