@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -11,8 +12,8 @@ const NUM_SUBCHUNKS: usize = 16;
 
 pub struct World {
     pub raw_world: RawWorld,
-    pub global_palette: BlockTable,
-    chunk_cache: HashMap<ChunkPos, Option<Chunk>>,
+    pub global_palette: RefCell<BlockTable>,
+    chunk_cache: RefCell<HashMap<ChunkPos, Option<Chunk>>>,
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -123,12 +124,12 @@ impl World {
         let raw_world = RawWorld::open(path)?;
         Ok(World {
             raw_world,
-            global_palette: BlockTable::new(),
-            chunk_cache: HashMap::new(),
+            global_palette: RefCell::new(BlockTable::new()),
+            chunk_cache: RefCell::new(HashMap::new()),
         })
     }
 
-    pub fn iter_chunks<'a>(&'a mut self) -> impl Iterator<Item = Result<ChunkPos>> + 'a {
+    pub fn iter_chunks<'a>(&'a self) -> impl Iterator<Item = Result<ChunkPos>> + 'a {
         // only include chunks instead of subchunk granularity, and keep errors
         self.raw_world.iter_chunks().filter_map(|c| match c {
             Ok(pos) => {
@@ -146,15 +147,19 @@ impl World {
         })
     }
 
-    fn translate_block_storage(&mut self, storage: &RawBlockStorage) -> Vec<BlockId> {
+    fn translate_block_storage(&self, storage: &RawBlockStorage) -> Vec<BlockId> {
         storage
             .blocks
             .iter()
-            .map(|b| self.global_palette.get_id(&storage.palette[*b as usize]))
+            .map(|b| {
+                self.global_palette
+                    .borrow_mut()
+                    .get_id(&storage.palette[*b as usize])
+            })
             .collect()
     }
 
-    fn load_subchunk(&mut self, pos: &SubchunkPos) -> Result<Option<ConvertedSubchunk>> {
+    fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<ConvertedSubchunk>> {
         let maybe_sc = self.raw_world.load_chunk(pos)?;
 
         match maybe_sc {
@@ -182,7 +187,7 @@ impl World {
         }
     }
 
-    fn load_chunk(&mut self, pos: &ChunkPos) -> Result<Option<Chunk>> {
+    fn load_chunk(&self, pos: &ChunkPos) -> Result<Option<Chunk>> {
         // If the bottom-most subchunk is not there, then the chunk has not been
         // stored in the world. Hence the bottom-most subchunk must be present.
         let bottom_subchunk = self.load_subchunk(&pos.subchunk_pos(0))?;
@@ -203,17 +208,18 @@ impl World {
         }
     }
 
-    pub fn get_block(&mut self, pos: &WorldPos) -> Result<(BlockId, BlockId)> {
+    pub fn get_block(&self, pos: &WorldPos) -> Result<(BlockId, BlockId)> {
         let chunk_pos = pos.to_chunk_pos();
 
+        let mut cache = self.chunk_cache.borrow_mut();
         // try to load chunk from cache, and otherwise load from disk and put it
         // in the cache
-        let maybe_chunk = if let Some(c) = self.chunk_cache.get(&chunk_pos) {
+        let maybe_chunk = if let Some(c) = cache.get(&chunk_pos) {
             c
         } else {
             let chunk = self.load_chunk(&chunk_pos)?;
-            self.chunk_cache.insert(chunk_pos.clone(), chunk);
-            &self.chunk_cache[&chunk_pos]
+            cache.insert(chunk_pos.clone(), chunk);
+            &cache[&chunk_pos]
         };
 
         match maybe_chunk {

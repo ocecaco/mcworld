@@ -20,9 +20,9 @@ mod error {
 fn main() {
     let path = Path::new("/home/daniel/L6yaXFjeAAA=/db");
     println!("{:?}", path);
-    let mut world = World::open(&path).unwrap();
+    let world = World::open(&path).unwrap();
 
-    let chunk_positions: Vec<_> = world.iter_chunks().collect();
+    let chunk_positions = world.iter_chunks();
 
     for pos in chunk_positions {
         let pos = pos.unwrap();
