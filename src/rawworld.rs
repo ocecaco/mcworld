@@ -81,12 +81,11 @@ impl RawWorld {
     pub fn iter_chunks(&self) -> SubchunkIterator {
         let read_options = ReadOptions::new();
         let dbiter = self.database.iter(&read_options);
-        let iter = SubchunkIterator {
+        SubchunkIterator {
             iter: dbiter,
             done: false,
             started: false,
-        };
-        iter
+        }
     }
 }
 

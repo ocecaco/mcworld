@@ -91,7 +91,7 @@ impl Chunk {
         // Not really sure why this formula is required... The heights don't
         // seem to be stored from y = 0 to y = 15 but in a different order.
         // the order is 7 6 5 4 3 2 1 0 15 14 13 12 11 10 9 8
-        let inner_y = (23 - w.y as i32 % 16) % 16;
+        let inner_y = (23 - i32::from(w.y) % 16) % 16;
         let inner_x = w.x - flooring_divide(w.x, 16) * 16;
         let inner_z = w.z - flooring_divide(w.z, 16) * 16;
 
@@ -218,7 +218,7 @@ impl World {
             c
         } else {
             let chunk = self.load_chunk(&chunk_pos)?;
-            cache.insert(chunk_pos.clone(), chunk);
+            cache.insert(chunk_pos, chunk);
             &cache[&chunk_pos]
         };
 

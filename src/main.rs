@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![warn(clippy::all)]
 use crate::rawworld::Dimension;
 use crate::rawworld::SubchunkPos;
 use crate::table::NOT_PRESENT;
