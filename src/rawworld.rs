@@ -49,7 +49,7 @@ pub struct RawWorld {
 
 impl RawWorld {
     pub fn open(path: &Path) -> Result<RawWorld> {
-        let mut options = Options::new();
+        let mut options = Options::default();
         options.compression = Compression::ZlibRaw;
 
         let database = Database::open(path, options)?;
@@ -61,7 +61,7 @@ impl RawWorld {
         let mut key_buf = [0u8; 32];
         let key_slice = encode_into_buffer(pos, &mut key_buf[..])?;
 
-        let read_options = ReadOptions::new();
+        let read_options = ReadOptions::default();
         let maybe_data = self.database.get_bytes(&read_options, key_slice)?;
 
         if let Some(b) = maybe_data {
@@ -79,7 +79,7 @@ impl RawWorld {
     }
 
     pub fn iter_chunks(&self) -> SubchunkIterator {
-        let read_options = ReadOptions::new();
+        let read_options = ReadOptions::default();
         let dbiter = self.database.iter(&read_options);
         SubchunkIterator {
             iter: dbiter,
