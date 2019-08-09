@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct BlockId(u32);
@@ -14,7 +14,7 @@ pub struct BlockDescription {
 
 pub struct BlockTable {
     id_to_description: Vec<BlockDescription>,
-    description_to_id: HashMap<BlockDescription, u32>,
+    description_to_id: FnvHashMap<BlockDescription, u32>,
 }
 
 impl BlockTable {
@@ -31,7 +31,7 @@ impl BlockTable {
 
         // this code should match the constants
         let id_to_description = vec![not_present_description.clone(), air_description.clone()];
-        let mut description_to_id = HashMap::new();
+        let mut description_to_id = FnvHashMap::default();
         description_to_id.insert(not_present_description, 0);
         description_to_id.insert(air_description, 1);
 

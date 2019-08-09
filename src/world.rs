@@ -1,6 +1,6 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::path::Path;
+use fnv::FnvHashMap;
 
 use crate::rawchunk::RawBlockStorage;
 use crate::rawworld::*;
@@ -13,7 +13,7 @@ const NUM_SUBCHUNKS: usize = 16;
 pub struct World {
     pub raw_world: RawWorld,
     pub global_palette: RefCell<BlockTable>,
-    chunk_cache: RefCell<HashMap<ChunkPos, Option<Chunk>>>,
+    chunk_cache: RefCell<FnvHashMap<ChunkPos, Option<Chunk>>>,
 }
 
 // uses indices into table stored in the World instead of a separate palette for
@@ -57,7 +57,7 @@ impl World {
         Ok(World {
             raw_world,
             global_palette: RefCell::new(BlockTable::new()),
-            chunk_cache: RefCell::new(HashMap::new()),
+            chunk_cache: RefCell::new(FnvHashMap::default()),
         })
     }
 

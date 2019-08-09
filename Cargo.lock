@@ -66,6 +66,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "fnv"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "hematite-nbt"
 version = "0.4.0"
 dependencies = [
@@ -100,6 +105,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "hematite-nbt 0.4.0",
  "leveldb 0.8.4",
 ]
@@ -216,6 +222,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7efb22686e4a466b1ec1a15c2898f91fa9cb340452496dca654032de20ff95b9"
 "checksum failure_derive 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "946d0e98a50d9831f5d589038d2ca7f8f455b1c21028c0db0e84116a12696426"
 "checksum flate2 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "e6234dd4468ae5d1e2dbb06fe2b058696fdc50a339c68a393aefbf00bc81e423"
+"checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
 "checksum libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)" = "1e5d97d6708edaa407429faa671b942dc0f2727222fb6b6539bf1db936e4b121"
 "checksum miniz-sys 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "609ce024854aeb19a0ef7567d348aaa5a746b32fb72e336df7fcc16869d7e2b4"
 "checksum proc-macro2 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)" = "cccdc7557a98fe98453030f077df7f3a042052fae465bb61d2c2c41435cfd9b6"

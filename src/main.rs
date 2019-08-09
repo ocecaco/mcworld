@@ -32,7 +32,6 @@ fn main() {
     // }).unwrap().0;
 
     // println!("{:?}", world.global_palette.borrow_mut().get_description(blk));
-
     let chunk_positions = world.iter_chunks();
     for pos in chunk_positions {
         let pos = pos.unwrap();
