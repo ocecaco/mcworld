@@ -6,53 +6,41 @@ pub struct BlockId(u32);
 pub const NOT_PRESENT: BlockId = BlockId(0);
 pub const AIR: BlockId = BlockId(1);
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct BlockDescription {
-    pub name: String,
-    pub val: u32,
-}
 
 pub struct BlockTable {
-    id_to_description: Vec<BlockDescription>,
-    description_to_id: FnvHashMap<BlockDescription, u32>,
+    id_to_name: Vec<String>,
+    name_to_id: FnvHashMap<String, u32>,
 }
 
 impl BlockTable {
     pub fn new() -> Self {
-        let not_present_description = BlockDescription {
-            name: "mcworld:missing".to_owned(),
-            val: 0,
-        };
-
-        let air_description = BlockDescription {
-            name: "minecraft:air".to_owned(),
-            val: 0,
-        };
+        let not_present = "mcworld:missing".to_owned();
+        let air = "minecraft:air".to_owned();
 
         // this code should match the constants
-        let id_to_description = vec![not_present_description.clone(), air_description.clone()];
-        let mut description_to_id = FnvHashMap::default();
-        description_to_id.insert(not_present_description, 0);
-        description_to_id.insert(air_description, 1);
+        let id_to_name = vec![not_present.clone(), air.clone()];
+        let mut name_to_id = FnvHashMap::default();
+        name_to_id.insert(not_present, 0);
+        name_to_id.insert(air, 1);
 
         BlockTable {
-            id_to_description,
-            description_to_id,
+            id_to_name,
+            name_to_id,
         }
     }
 
-    pub fn get_id(&mut self, description: &BlockDescription) -> BlockId {
-        if let Some(id) = self.description_to_id.get(description) {
+    pub fn get_id(&mut self, name: &str) -> BlockId {
+        if let Some(id) = self.name_to_id.get(name) {
             BlockId(*id)
         } else {
-            let id = self.id_to_description.len() as u32;
-            self.id_to_description.push(description.clone());
-            self.description_to_id.insert(description.clone(), id);
+            let id = self.id_to_name.len() as u32;
+            self.id_to_name.push(name.to_owned());
+            self.name_to_id.insert(name.to_owned(), id);
             BlockId(id)
         }
     }
 
-    pub fn get_description(&self, id: BlockId) -> &BlockDescription {
-        &self.id_to_description[id.0 as usize]
+    pub fn get_name(&self, id: BlockId) -> &str {
+        &self.id_to_name[id.0 as usize]
     }
 }

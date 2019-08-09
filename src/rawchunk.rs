@@ -1,8 +1,13 @@
 use crate::error::Result;
-use crate::table::BlockDescription;
 use byteorder::{LittleEndian, ReadBytesExt};
 use nbt::{Blob, Value};
 use std::io::Read;
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct PaletteEntry {
+    pub name: String,
+    pub val: u32,
+}
 
 struct Decoder<'a, T: 'a> {
     reader: &'a mut T,
@@ -53,7 +58,7 @@ where
         Ok(blocks)
     }
 
-    fn decode_palette(&mut self) -> Result<Vec<BlockDescription>> {
+    fn decode_palette(&mut self) -> Result<Vec<PaletteEntry>> {
         let mut palette = Vec::new();
         let num_entries = self.reader.read_u32::<LittleEndian>()?;
 
@@ -65,7 +70,7 @@ where
         Ok(palette)
     }
 
-    fn decode_palette_entry(&mut self) -> Result<BlockDescription> {
+    fn decode_palette_entry(&mut self) -> Result<PaletteEntry> {
         let blob = Blob::from_reader(self.reader)?;
         let name = match blob["name"] {
             Value::String(ref s) => s.clone(),
@@ -75,7 +80,7 @@ where
             Value::Short(i) => i,
             _ => panic!("no val field"),
         };
-        Ok(BlockDescription {
+        Ok(PaletteEntry {
             name,
             val: val as u32,
         })
@@ -119,5 +124,5 @@ impl Subchunk {
 #[derive(Debug, Clone)]
 pub struct RawBlockStorage {
     pub blocks: Vec<u16>,
-    pub palette: Vec<BlockDescription>,
+    pub palette: Vec<PaletteEntry>,
 }
