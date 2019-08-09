@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![warn(clippy::all)]
-use crate::rawworld::Dimension;
-use crate::rawworld::SubchunkPos;
+use crate::rawworld::*;
 use crate::table::NOT_PRESENT;
-use crate::world::{World, WorldPos};
+use crate::world::*;
+use crate::pos::*;
 use std::path::Path;
 
 mod encode;
@@ -12,6 +12,7 @@ mod rawchunk;
 mod rawworld;
 mod table;
 mod world;
+mod pos;
 
 mod error {
     pub use failure::Error;
@@ -19,33 +20,46 @@ mod error {
 }
 
 fn main() {
-    let path = Path::new("/home/daniel/L6yaXFjeAAA=/db");
+    let path = Path::new("/home/daniel/mcpe/Ns4HXdObBQA=/db");
     println!("{:?}", path);
     let world = World::open(&path).unwrap();
 
-    let chunk_positions = world.iter_chunks();
+    // let blk = world.get_block(&WorldPos {
+    //     x: -80,
+    //     y: 11,
+    //     z: -1,
+    //     dimension: Dimension::Overworld,
+    // }).unwrap().0;
 
-    for pos in chunk_positions {
-        let pos = pos.unwrap();
+    // println!("{:?}", world.global_palette.borrow_mut().get_description(blk));
 
-        if pos.dimension != Dimension::Overworld {
-            continue;
-        }
+    // let chunk_positions = world.iter_chunks();
 
-        for dy in 0..=255 {
-            for dz in 0..16 {
-                for dx in 0..16 {
-                    let world_pos = WorldPos {
-                        x: 16 * pos.x + dx,
-                        y: dy,
-                        z: 16 * pos.z + dz,
-                        dimension: Dimension::Overworld,
-                    };
-                    world.get_block(&world_pos).unwrap();
-                }
+    // for pos in chunk_positions {
+    let pos = ChunkPos {
+        x: -21,
+        z: 3,
+        dimension: Dimension::Overworld,
+    };
+
+    // if pos.dimension != Dimension::Overworld {
+    //     continue;
+    // }
+
+    for dy in 0..=255 {
+        for dz in 0..16 {
+            for dx in 0..16 {
+                let world_pos = WorldPos {
+                    x: 16 * pos.x + dx,
+                    y: dy,
+                    z: 16 * pos.z + dz,
+                    dimension: Dimension::Overworld,
+                };
+                world.get_block(&world_pos).unwrap();
             }
         }
     }
+    // }
 
     println!("Great success!");
 }

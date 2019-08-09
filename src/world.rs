@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::rawchunk::RawBlockStorage;
-use crate::rawworld::{Dimension, RawWorld, SubchunkPos};
+use crate::rawworld::*;
+use crate::pos::*;
 use crate::table::{BlockId, BlockTable, AIR, NOT_PRESENT};
-
 use crate::error::*;
 
 const NUM_SUBCHUNKS: usize = 16;
@@ -14,42 +14,6 @@ pub struct World {
     pub raw_world: RawWorld,
     pub global_palette: RefCell<BlockTable>,
     chunk_cache: RefCell<HashMap<ChunkPos, Option<Chunk>>>,
-}
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ChunkPos {
-    pub x: i32,
-    pub z: i32,
-    pub dimension: Dimension,
-}
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct WorldPos {
-    pub x: i32,
-    pub y: u8,
-    pub z: i32,
-    pub dimension: Dimension,
-}
-
-impl WorldPos {
-    fn to_chunk_pos(&self) -> ChunkPos {
-        ChunkPos {
-            x: flooring_divide(self.x, 16),
-            z: flooring_divide(self.z, 16),
-            dimension: self.dimension,
-        }
-    }
-}
-
-impl ChunkPos {
-    fn subchunk_pos(&self, subchunk: u8) -> SubchunkPos {
-        SubchunkPos {
-            x: self.x,
-            z: self.z,
-            subchunk,
-            dimension: self.dimension,
-        }
-    }
 }
 
 // uses indices into table stored in the World instead of a separate palette for
@@ -66,49 +30,17 @@ struct Chunk {
     subchunks: Vec<Option<ConvertedSubchunk>>,
 }
 
-fn flooring_divide(n: i32, k: u32) -> i32 {
-    let k = k as i32;
-    let div = n / k;
-    let rem = n - div * k;
-
-    // no need for fancy rounding if the remainder is 0
-    if rem == 0 {
-        return div;
-    }
-
-    // otherwise fix up the negative numbers to make the rounding go to negative
-    //  infinity instead of zero
-    if n < 0 {
-        div - 1
-    } else {
-        div
-    }
-}
-
 impl Chunk {
     fn get_block(&self, w: &WorldPos) -> (BlockId, BlockId) {
-        let subchunk_offset = w.y / 16;
-        // Not really sure why this formula is required... The heights don't
-        // seem to be stored from y = 0 to y = 15 but in a different order.
-        // the order is 7 6 5 4 3 2 1 0 15 14 13 12 11 10 9 8
-        let inner_y = (23 - i32::from(w.y) % 16) % 16;
-        let inner_x = w.x - flooring_divide(w.x, 16) * 16;
-        let inner_z = w.z - flooring_divide(w.z, 16) * 16;
+        let sub_y = w.subchunk_y();
+        let sub_offset = w.subchunk_offset();
 
-        assert!(inner_x >= 0 && inner_x < 16);
-        assert!(inner_y >= 0 && inner_y < 16);
-        assert!(inner_z >= 0 && inner_z < 16);
-        assert!(subchunk_offset < 16);
-
-        // TODO: Correct order?
-        let final_offset = (16 * 16 * inner_x + 16 * inner_z + inner_y) as usize;
-
-        let maybe_subchunk = &self.subchunks[subchunk_offset as usize];
+        let maybe_subchunk = &self.subchunks[sub_y];
         match maybe_subchunk {
             Some(subchunk) => {
-                let block1 = subchunk.data1[final_offset];
+                let block1 = subchunk.data1[sub_offset];
                 let block2 = if let Some(data2) = &subchunk.data2 {
-                    data2[final_offset]
+                    data2[sub_offset]
                 } else {
                     NOT_PRESENT
                 };
@@ -209,7 +141,7 @@ impl World {
     }
 
     pub fn get_block(&self, pos: &WorldPos) -> Result<(BlockId, BlockId)> {
-        let chunk_pos = pos.to_chunk_pos();
+        let chunk_pos = pos.chunk_pos();
 
         let mut cache = self.chunk_cache.borrow_mut();
         // try to load chunk from cache, and otherwise load from disk and put it

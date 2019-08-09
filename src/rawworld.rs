@@ -1,5 +1,3 @@
-use crate::encode::{encode_into_buffer, Encode};
-use crate::rawchunk::Subchunk;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use leveldb::database::iterator::DatabaseIterator;
 use leveldb::database::Database;
@@ -8,40 +6,9 @@ use std::io::{Cursor, Read, Write};
 use std::path::Path;
 
 use crate::error::*;
-
-const SUBCHUNK_KEY_LEN_OVERWORLD: usize = 10;
-const SUBCHUNK_KEY_LEN_OTHER: usize = 14;
-const SUBCHUNK_PREFIX: u8 = 47;
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Dimension {
-    Overworld = 0,
-    Nether = 1,
-    End = 2,
-}
-
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct SubchunkPos {
-    pub x: i32,
-    pub z: i32,
-    pub subchunk: u8,
-    pub dimension: Dimension,
-}
-
-impl Encode for SubchunkPos {
-    type Error = Error;
-
-    fn encode<T: Write>(&self, buf: &mut T) -> Result<()> {
-        buf.write_i32::<LittleEndian>(self.x)?;
-        buf.write_i32::<LittleEndian>(self.z)?;
-        if self.dimension != Dimension::Overworld {
-            buf.write_u32::<LittleEndian>(self.dimension as u32)?;
-        }
-        buf.write_all(&[SUBCHUNK_PREFIX])?;
-        buf.write_all(&[self.subchunk])?;
-        Ok(())
-    }
-}
+use crate::encode::{encode_into_buffer, Encode};
+use crate::rawchunk::Subchunk;
+use crate::pos::*;
 
 pub struct RawWorld {
     database: Database,
@@ -71,6 +38,10 @@ impl RawWorld {
 
             // make sure we consume ALL of the data
             assert_eq!(cursor.position() as usize, len);
+
+            if pos == &(SubchunkPos { x: -21, z: 3, subchunk: 5, dimension: Dimension::Overworld }) {
+                println!("Data: {:?}", chunk);
+            }
 
             Ok(Some(chunk))
         } else {
