@@ -54,34 +54,41 @@ impl RawWorld {
         let dbiter = self.database.iter(&read_options);
         SubchunkIterator {
             iter: dbiter,
-            done: false,
-            started: false,
+            state: SubchunkIteratorState::NotStarted,
         }
     }
 }
 
+enum SubchunkIteratorState {
+    NotStarted,
+    Started,
+    Done,
+}
+
 pub struct SubchunkIterator<'a> {
     iter: DatabaseIterator<'a>,
-    done: bool,
-    started: bool,
+    state: SubchunkIteratorState,
 }
 
 impl<'a> Iterator for SubchunkIterator<'a> {
     type Item = Result<SubchunkPos>;
 
     fn next(&mut self) -> Option<Result<SubchunkPos>> {
-        if self.done {
-            return None;
+        match self.state {
+            SubchunkIteratorState::Done => return None,
+            SubchunkIteratorState::NotStarted => {
+                self.iter.seek_to_first();
+                self.state = SubchunkIteratorState::Started;
+            }
+            SubchunkIteratorState::Started => {}
         }
 
-        if !self.started {
-            self.iter.seek_to_first();
-            self.started = true;
-        }
+        // At this point, we now that the iterator is in the Started
+        // state
 
         loop {
             if !self.iter.valid() {
-                self.done = true;
+                self.state = SubchunkIteratorState::Done;
                 return None;
             }
 
@@ -91,7 +98,7 @@ impl<'a> Iterator for SubchunkIterator<'a> {
                 // position key, then mark the iteration as done and
                 // return the error
                 if res.is_err() {
-                    self.done = true;
+                    self.state = SubchunkIteratorState::Done;
                 }
 
                 self.iter.next();
