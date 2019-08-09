@@ -86,22 +86,10 @@ impl<'a> Iterator for SubchunkIterator<'a> {
             }
 
             let key_slice = self.iter.key();
-
-            // check if the one-to-last element of the key contains the subchunk
-            // prefix, otherwise it does not contain block data
-            let result = if key_slice[key_slice.len() - 2] == SUBCHUNK_PREFIX {
-                if key_slice.len() == SUBCHUNK_KEY_LEN_OVERWORLD {
-                    Some(decode_pos(key_slice, true))
-                } else if key_slice.len() == SUBCHUNK_KEY_LEN_OTHER {
-                    Some(decode_pos(key_slice, false))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            if let Some(res) = result {
+            if let Some(res) = try_decode_pos(key_slice) {
+                // If an error occurs while trying to decode the
+                // position key, then mark the iteration as done and
+                // return the error
                 if res.is_err() {
                     self.done = true;
                 }
@@ -113,6 +101,22 @@ impl<'a> Iterator for SubchunkIterator<'a> {
             // skip keys which do not represent subchunk block data
             self.iter.next();
         }
+    }
+}
+
+fn try_decode_pos(key: &[u8]) -> Option<Result<SubchunkPos>> {
+    // check if the one-to-last element of the key contains the subchunk
+    // prefix, otherwise it does not contain block data
+    if key[key.len() - 2] == SUBCHUNK_PREFIX {
+        if key.len() == SUBCHUNK_KEY_LEN_OVERWORLD {
+            Some(decode_pos(key, true))
+        } else if key.len() == SUBCHUNK_KEY_LEN_OTHER {
+            Some(decode_pos(key, false))
+        } else {
+            None
+        }
+    } else {
+        None
     }
 }
 
