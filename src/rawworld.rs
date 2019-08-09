@@ -39,10 +39,6 @@ impl RawWorld {
             // make sure we consume ALL of the data
             assert_eq!(cursor.position() as usize, len);
 
-            if pos == &(SubchunkPos { x: -21, z: 3, subchunk: 5, dimension: Dimension::Overworld }) {
-                println!("Data: {:?}", chunk);
-            }
-
             Ok(Some(chunk))
         } else {
             Ok(None)
