@@ -34,11 +34,7 @@ impl WorldPos {
     }
 
     pub fn subchunk_offset(&self) -> usize {
-        // Not really sure why this formula is required... The heights don't
-        // seem to be stored from y = 0 to y = 15 but in a different order.
-        // the order is 7 6 5 4 3 2 1 0 15 14 13 12 11 10 9 8
-        let inner_y = (23 - i32::from(self.y) % 16) % 16;
-
+        let inner_y = i32::from(self.y % 16);
         let inner_x = self.x - flooring_divide(self.x, 16) * 16;
         let inner_z = self.z - flooring_divide(self.z, 16) * 16;
 

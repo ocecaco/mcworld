@@ -87,21 +87,20 @@ fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u16>) {
 
     let num_blocks = WORD_SIZE / bits_per_block;
 
-    let padding_length = WORD_SIZE % bits_per_block;
-
-    // mask with upper bits_per_block bits set to 1
-    let mask = !((!0u32 << bits_per_block) >> bits_per_block);
-    let shift_correction = WORD_SIZE - bits_per_block;
-
-    // shift off the padding
-    w <<= padding_length;
+    // all_ones = 11111111111111111111111111111111
+    let all_ones = !0u32;
+    // lower_zeros = 11111111111111111111111111100000 (for bits_per_block = 5)
+    let lower_zeros = all_ones << bits_per_block;
+    // lower_ones = 00000000000000000000000000011111
+    let lower_ones = !lower_zeros;
+    // lower_ones is a mask with the lower bits_per_block bits set to 1
 
     for _ in 0..num_blocks {
-        let b = (w & mask) >> shift_correction;
+        let b = w & lower_ones;
         output.push(b as u16);
 
         // shift to next block
-        w <<= bits_per_block;
+        w >>= bits_per_block;
     }
 }
 
