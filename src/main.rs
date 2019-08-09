@@ -26,40 +26,35 @@ fn main() {
 
     // let blk = world.get_block(&WorldPos {
     //     x: -80,
-    //     y: 11,
+    //     y: 12,
     //     z: -1,
     //     dimension: Dimension::Overworld,
     // }).unwrap().0;
 
     // println!("{:?}", world.global_palette.borrow_mut().get_description(blk));
 
-    // let chunk_positions = world.iter_chunks();
+    let chunk_positions = world.iter_chunks();
+    for pos in chunk_positions {
+        let pos = pos.unwrap();
 
-    // for pos in chunk_positions {
-    let pos = ChunkPos {
-        x: -21,
-        z: 3,
-        dimension: Dimension::Overworld,
-    };
+        if pos.dimension != Dimension::Overworld {
+            continue;
+        }
 
-    // if pos.dimension != Dimension::Overworld {
-    //     continue;
-    // }
-
-    for dy in 0..=255 {
-        for dz in 0..16 {
-            for dx in 0..16 {
-                let world_pos = WorldPos {
-                    x: 16 * pos.x + dx,
-                    y: dy,
-                    z: 16 * pos.z + dz,
-                    dimension: Dimension::Overworld,
-                };
-                world.get_block(&world_pos).unwrap();
+        for dy in 0..=255 {
+            for dz in 0..16 {
+                for dx in 0..16 {
+                    let world_pos = WorldPos {
+                        x: 16 * pos.x + dx,
+                        y: dy,
+                        z: 16 * pos.z + dz,
+                        dimension: Dimension::Overworld,
+                    };
+                    world.get_block(&world_pos).unwrap();
+                }
             }
         }
     }
-    // }
 
     println!("Great success!");
 }
