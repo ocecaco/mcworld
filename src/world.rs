@@ -18,8 +18,8 @@ pub struct BlockInfo {
 }
 
 pub struct World {
-    pub raw_world: RawWorld,
-    pub global_palette: RefCell<BlockTable>,
+    raw_world: RawWorld,
+    global_palette: RefCell<BlockTable>,
     chunk_cache: RefCell<FnvHashMap<ChunkPos, Option<Chunk>>>,
 }
 
@@ -172,5 +172,13 @@ impl World {
             Some(chunk) => Ok(chunk.get_block(pos)),
             None => Ok((NOT_PRESENT_INFO, NOT_PRESENT_INFO)),
         }
+    }
+
+    pub fn block_id(&self, name: &str) -> BlockId {
+        self.global_palette.borrow_mut().get_id(name)
+    }
+
+    pub fn block_name(&self, id: BlockId) -> String {
+        self.global_palette.borrow_mut().get_name(id).to_owned()
     }
 }
