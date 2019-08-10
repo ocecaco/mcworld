@@ -105,7 +105,7 @@ impl World {
     }
 
     fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<ConvertedSubchunk>> {
-        let maybe_sc = self.raw_world.load_chunk(pos)?;
+        let maybe_sc = self.raw_world.load_subchunk(pos)?;
 
         match maybe_sc {
             Some(sc) => {

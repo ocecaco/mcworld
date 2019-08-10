@@ -24,7 +24,7 @@ impl RawWorld {
         Ok(RawWorld { database })
     }
 
-    pub fn load_chunk(&self, pos: &SubchunkPos) -> Result<Option<Subchunk>> {
+    pub fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<Subchunk>> {
         let mut key_buf = [0u8; 32];
         let key_slice = encode_into_buffer(pos, &mut key_buf[..])?;
 
@@ -34,6 +34,7 @@ impl RawWorld {
         if let Some(b) = maybe_data {
             let len = b.len();
             let mut cursor = Cursor::new(b);
+
             let chunk = Subchunk::deserialize(&mut cursor)?;
 
             // make sure we consume ALL of the data

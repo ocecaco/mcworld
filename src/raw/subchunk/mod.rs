@@ -2,7 +2,7 @@ mod deserialize;
 mod serialize;
 
 use crate::error::Result;
-use std::io::Read;
+use std::io::{Read, Write};
 pub use deserialize::*;
 pub use serialize::*;
 
@@ -27,5 +27,10 @@ impl Subchunk {
     pub fn deserialize<T: Read>(reader: &mut T) -> Result<Subchunk> {
         let mut decoder = Decoder::new(reader);
         decoder.decode_chunk()
+    }
+
+    pub fn serialize<T: Write>(&self, writer: &mut T) -> Result<()> {
+        let mut encoder = Encoder::new(writer);
+        encoder.encode_chunk(self)
     }
 }
