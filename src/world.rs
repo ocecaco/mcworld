@@ -6,11 +6,10 @@ use std::path::Path;
 
 use crate::error::*;
 use crate::pos::*;
-use crate::raw::subchunk::{BlockStorage, PaletteEntry, Subchunk};
-use crate::raw::RawWorld;
+use crate::raw::{RawWorld, BlockStorage, PaletteEntry, Subchunk, SubchunkPos};
 use crate::table::{BlockId, BlockTable, AIR};
 
-const AIR_INFO: BlockInfo = BlockInfo {
+const AIR_INFO: BlockData = BlockData {
     block_id: AIR,
     block_val: 0,
 };
@@ -18,15 +17,15 @@ const NUM_SUBCHUNKS: u8 = 16;
 const CHUNK_SIZE: usize = 4096;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct BlockInfo {
+pub struct BlockData {
     pub block_id: BlockId,
     pub block_val: u16,
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct BlockData {
-    pub layer1: BlockInfo,
-    pub layer2: BlockInfo,
+pub struct BlockLayers {
+    pub layer1: BlockData,
+    pub layer2: BlockData,
 }
 
 type ChunkCache = FnvHashMap<ChunkPos, Option<Chunk>>;
@@ -41,8 +40,8 @@ pub struct World {
 // each subchunk
 #[derive(Debug, Clone)]
 struct WorldSubchunk {
-    data1: Vec<BlockInfo>,
-    data2: Vec<BlockInfo>,
+    data1: Vec<BlockData>,
+    data2: Vec<BlockData>,
 }
 
 #[derive(Debug, Clone)]
@@ -52,20 +51,20 @@ struct Chunk {
 }
 
 impl Chunk {
-    fn get_block(&self, w: &WorldPos) -> BlockData {
+    fn get_block(&self, w: &WorldPos) -> BlockLayers {
         let sub_y = w.subchunk_y();
         let sub_offset = w.subchunk_offset();
 
         let subchunk = &self.subchunks[sub_y];
         let block1 = subchunk.data1[sub_offset];
         let block2 = subchunk.data2[sub_offset];
-        BlockData {
+        BlockLayers {
             layer1: block1,
             layer2: block2,
         }
     }
 
-    fn set_block(&mut self, w: &WorldPos, d: BlockData) {
+    fn set_block(&mut self, w: &WorldPos, d: BlockLayers) {
         let sub_y = w.subchunk_y();
         let sub_offset = w.subchunk_offset();
 
@@ -104,14 +103,14 @@ impl World {
         })
     }
 
-    fn translate_block_storage(&self, storage: &BlockStorage) -> Vec<BlockInfo> {
+    fn translate_block_storage(&self, storage: &BlockStorage) -> Vec<BlockData> {
         storage
             .blocks
             .iter()
             .map(|b| {
                 let description = &storage.palette[*b as usize];
                 let block_id = self.global_palette.borrow_mut().get_id(&description.name);
-                BlockInfo {
+                BlockData {
                     block_id,
                     block_val: description.val,
                 }
@@ -164,12 +163,12 @@ impl World {
 
     fn create_palette(
         &self,
-        layer: &[BlockInfo],
-    ) -> (FnvHashMap<BlockInfo, u16>, Vec<PaletteEntry>) {
-        let unique_blocks: FnvHashSet<BlockInfo> = layer.iter().cloned().collect();
-        let unique_blocks: Vec<BlockInfo> = unique_blocks.iter().cloned().collect();
+        layer: &[BlockData],
+    ) -> (FnvHashMap<BlockData, u16>, Vec<PaletteEntry>) {
+        let unique_blocks: FnvHashSet<BlockData> = layer.iter().cloned().collect();
+        let unique_blocks: Vec<BlockData> = unique_blocks.iter().cloned().collect();
 
-        // mapping from BlockInfo to index in the palette
+        // mapping from BlockData to index in the palette
         let mapping = unique_blocks
             .iter()
             .enumerate()
@@ -189,7 +188,7 @@ impl World {
         (mapping, palette)
     }
 
-    fn convert_world_layer(&self, layer: &[BlockInfo]) -> BlockStorage {
+    fn convert_world_layer(&self, layer: &[BlockData]) -> BlockStorage {
         let (mapping, palette) = self.create_palette(layer);
         let paletted_blocks = layer.iter().map(|bi| mapping[bi]).collect();
 
@@ -266,7 +265,7 @@ impl World {
         Ok(cache.get_mut(&chunk_pos).unwrap())
     }
 
-    pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockData>> {
+    pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockLayers>> {
         let mut cache = self.chunk_cache.borrow_mut();
         let maybe_chunk = self.cached_chunk(&mut cache, pos.chunk_pos())?;
 
@@ -276,7 +275,7 @@ impl World {
         }
     }
 
-    pub fn set_block(&self, pos: &WorldPos, data: BlockData) -> Result<()> {
+    pub fn set_block(&self, pos: &WorldPos, data: BlockLayers) -> Result<()> {
         let mut cache = self.chunk_cache.borrow_mut();
         let maybe_chunk = self.cached_chunk(&mut cache, pos.chunk_pos())?;
 
@@ -324,7 +323,7 @@ impl World {
     }
 }
 
-fn create_air_layer() -> Vec<BlockInfo> {
+fn create_air_layer() -> Vec<BlockData> {
     vec![AIR_INFO; CHUNK_SIZE]
 }
 
