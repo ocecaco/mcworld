@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 use std::path::Path;
 use fnv::FnvHashMap;
+use fnv::FnvHashSet;
 
 use crate::raw::RawWorld;
-use crate::raw::subchunk::BlockStorage;
+use crate::raw::subchunk::{Subchunk, BlockStorage, PaletteEntry};
 use crate::pos::*;
 use crate::table::{BlockId, BlockTable, AIR};
 use crate::error::*;
@@ -30,7 +31,7 @@ pub struct World {
 
 // uses indices into table stored in the World instead of a separate palette for
 // each subchunk
-struct ConvertedSubchunk {
+struct WorldSubchunk {
     data1: Vec<BlockInfo>,
     data2: Option<Vec<BlockInfo>>,
 }
@@ -39,7 +40,7 @@ struct Chunk {
     // subchunks might be missing, which means they are filled with air. The
     // length of this vector should always be exactly 16, since that is the
     // number of subchunks per chunk.
-    subchunks: Vec<Option<ConvertedSubchunk>>,
+    subchunks: Vec<Option<WorldSubchunk>>,
 }
 
 impl Chunk {
@@ -104,31 +105,70 @@ impl World {
             .collect()
     }
 
-    fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<ConvertedSubchunk>> {
+    fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<WorldSubchunk>> {
         let maybe_sc = self.raw_world.load_subchunk(pos)?;
 
-        match maybe_sc {
-            Some(sc) => {
-                let count = sc.block_storages.len();
-                assert!(
-                    count == 1 || count == 2,
-                    "should have one or two BlockStorages"
-                );
+        Ok(maybe_sc.as_ref().map(|sc| self.convert_subchunk(sc)))
+    }
 
-                let bs1 = self.translate_block_storage(&sc.block_storages[0]);
+    fn convert_subchunk(&self, sc: &Subchunk) -> WorldSubchunk {
+        let count = sc.block_storages.len();
+        assert!(
+            count == 1 || count == 2,
+            "should have one or two BlockStorages"
+        );
 
-                // second blockstorage might be missing
-                let bs2 = sc
-                    .block_storages
-                    .get(1)
-                    .map(|bs| self.translate_block_storage(&bs));
+        let bs1 = self.translate_block_storage(&sc.block_storages[0]);
 
-                Ok(Some(ConvertedSubchunk {
-                    data1: bs1,
-                    data2: bs2,
-                }))
-            }
-            None => Ok(None),
+        // second blockstorage might be missing
+        let bs2 = sc
+            .block_storages
+            .get(1)
+            .map(|bs| self.translate_block_storage(&bs));
+
+        WorldSubchunk {
+            data1: bs1,
+            data2: bs2,
+        }
+    }
+
+    fn create_palette(&self, layer: &[BlockInfo]) -> (FnvHashMap<BlockInfo, u16>, Vec<PaletteEntry>) {
+        let unique_blocks: FnvHashSet<BlockInfo> = layer.iter().cloned().collect();
+        let unique_blocks: Vec<BlockInfo> = unique_blocks.iter().cloned().collect();
+
+        // mapping from BlockInfo to index in the palette
+        let mapping = unique_blocks.iter().enumerate().map(|(i, bi)| (*bi, i as u16)).collect();
+
+        // create a palette by looking up the names corresponding to
+        // the block IDs
+        let palette = unique_blocks.iter().map(|bi| PaletteEntry {
+            name: self.block_name(bi.block_id),
+            val: bi.block_val,
+        }).collect();
+
+        (mapping, palette)
+    }
+
+    fn convert_world_layer(&self, layer: &[BlockInfo]) -> BlockStorage {
+        let (mapping, palette) = self.create_palette(layer);
+        let paletted_blocks = layer.iter().map(|bi| mapping[bi]).collect();
+
+        BlockStorage {
+            blocks: paletted_blocks,
+            palette,
+        }
+    }
+
+    fn convert_world_subchunk(&self, sc: &WorldSubchunk) -> Subchunk {
+        let mut layers = Vec::new();
+
+        layers.push(self.convert_world_layer(&sc.data1));
+        if let Some(data2) = &sc.data2 {
+            layers.push(self.convert_world_layer(&data2));
+        }
+
+        Subchunk {
+            block_storages: layers,
         }
     }
 
