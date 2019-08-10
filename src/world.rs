@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::path::Path;
 use fnv::FnvHashMap;
 
-use crate::rawchunk::RawBlockStorage;
-use crate::rawworld::*;
+use crate::raw::RawWorld;
+use crate::raw::chunk::BlockStorage;
 use crate::pos::*;
 use crate::table::{BlockId, BlockTable, AIR, NOT_PRESENT};
 use crate::error::*;
@@ -86,7 +86,7 @@ impl World {
         })
     }
 
-    fn translate_block_storage(&self, storage: &RawBlockStorage) -> Vec<BlockInfo> {
+    fn translate_block_storage(&self, storage: &BlockStorage) -> Vec<BlockInfo> {
         storage
             .blocks
             .iter()

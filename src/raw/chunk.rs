@@ -33,7 +33,7 @@ where
         })
     }
 
-    fn decode_storage(&mut self) -> Result<RawBlockStorage> {
+    fn decode_storage(&mut self) -> Result<BlockStorage> {
         let format = self.reader.read_u8()?;
         let network = 0b0000_0001 & format;
         assert_eq!(network, 0);
@@ -42,7 +42,7 @@ where
         let blocks = self.decode_blocks(bits_per_block)?;
         let palette = self.decode_palette()?;
 
-        Ok(RawBlockStorage { blocks, palette })
+        Ok(BlockStorage { blocks, palette })
     }
 
     fn decode_blocks(&mut self, bits_per_block: u32) -> Result<Vec<u16>> {
@@ -111,7 +111,7 @@ fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u16>) {
 
 #[derive(Debug, Clone)]
 pub struct Subchunk {
-    pub block_storages: Vec<RawBlockStorage>,
+    pub block_storages: Vec<BlockStorage>,
 }
 
 impl Subchunk {
@@ -122,7 +122,7 @@ impl Subchunk {
 }
 
 #[derive(Debug, Clone)]
-pub struct RawBlockStorage {
+pub struct BlockStorage {
     pub blocks: Vec<u16>,
     pub palette: Vec<PaletteEntry>,
 }

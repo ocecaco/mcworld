@@ -1,25 +1,23 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![warn(clippy::all)]
-use crate::rawworld::*;
 use crate::table::{BlockId, NOT_PRESENT, AIR};
-use crate::world::*;
-use crate::pos::*;
-use crate::neighbor::*;
+use crate::world::World;
+use crate::pos::{WorldPos, Dimension};
+use crate::neighbor::NeighborIterator;
 use crate::error::*;
+
 use std::path::Path;
 use fnv::FnvHashMap;
 use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
 use std::io::{self, Write};
 
-mod encode;
-mod rawchunk;
-mod rawworld;
 mod table;
 mod world;
 mod pos;
 mod neighbor;
+mod raw;
 
 mod error {
     pub use failure::Error;

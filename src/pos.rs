@@ -1,7 +1,7 @@
 use crate::error::*;
+use crate::raw::encode::{encode_into_buffer, Encode};
 use std::io::{Cursor, Read, Write};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use crate::encode::{encode_into_buffer, Encode};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ChunkPos {

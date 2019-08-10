@@ -6,8 +6,8 @@ use std::io::{Cursor, Read, Write};
 use std::path::Path;
 
 use crate::error::*;
-use crate::encode::{encode_into_buffer, Encode};
-use crate::rawchunk::Subchunk;
+use crate::raw::encode::{encode_into_buffer, Encode};
+use crate::raw::chunk::Subchunk;
 use crate::pos::*;
 
 pub struct RawWorld {
