@@ -1,23 +1,23 @@
-use crate::error::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 use nbt::{Blob, Value};
 use std::io::Read;
+use super::*;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct PaletteEntry {
-    pub name: String,
-    pub val: u32,
+pub struct Decoder<'a, T: 'a> {
+    reader: &'a mut T,
 }
 
-struct Decoder<'a, T: 'a> {
-    reader: &'a mut T,
+impl<'a, T: 'a> Decoder<'a, T> {
+    pub fn new(reader: &'a mut T) -> Self {
+        Decoder { reader }
+    }
 }
 
 impl<'a, T> Decoder<'a, T>
 where
     T: Read,
 {
-    fn decode_chunk(&mut self) -> Result<Subchunk> {
+    pub fn decode_chunk(&mut self) -> Result<Subchunk> {
         let version = self.reader.read_u8()?;
         assert_eq!(version, 8);
 
@@ -107,22 +107,4 @@ fn unpack_word(mut w: u32, bits_per_block: u32, output: &mut Vec<u16>) {
         // shift to next block
         w >>= bits_per_block;
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Subchunk {
-    pub block_storages: Vec<BlockStorage>,
-}
-
-impl Subchunk {
-    pub fn deserialize<T: Read>(reader: &mut T) -> Result<Subchunk> {
-        let mut decoder = Decoder { reader };
-        decoder.decode_chunk()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct BlockStorage {
-    pub blocks: Vec<u16>,
-    pub palette: Vec<PaletteEntry>,
 }
