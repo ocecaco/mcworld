@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![warn(clippy::all)]
-use crate::table::{BlockId, NOT_PRESENT, AIR};
+use crate::table::{BlockId, AIR};
 use crate::world::World;
 use crate::pos::{WorldPos, Dimension};
 use crate::neighbor::NeighborIterator;
@@ -27,14 +27,22 @@ mod error {
 type ParentMap = FnvHashMap<WorldPos, WorldPos>;
 
 fn is_inside(world: &World, mut pos: WorldPos) -> Result<bool> {
-    let (info1, _info2) = world.get_block(&pos)?;
-    if info1.block_id != AIR {
+    let data = world.get_block(&pos)?;
+
+    // stop if the starting block is not air
+    if let Some(blk) = data {
+        if blk.layer1.block_id != AIR {
+            return Ok(false);
+        }
+    } else {
         return Ok(false);
     }
 
+    // go up in height until we find a non-air block or we hit the ceiling
     loop {
-        let (info1, _info2) = world.get_block(&pos)?;
-        if info1.block_id != AIR || pos.y == 255 {
+        let data = world.get_block(&pos)?;
+        let data = data.expect("should never go out of world bounds when increasing y since y is a u8");
+        if data.layer1.block_id != AIR || pos.y == 255 {
             break;
         }
         pos.y += 1;

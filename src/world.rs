@@ -5,16 +5,21 @@ use fnv::FnvHashMap;
 use crate::raw::RawWorld;
 use crate::raw::subchunk::BlockStorage;
 use crate::pos::*;
-use crate::table::{BlockId, BlockTable, AIR, NOT_PRESENT};
+use crate::table::{BlockId, BlockTable, AIR};
 use crate::error::*;
 
-const NOT_PRESENT_INFO: BlockInfo = BlockInfo { block_id: NOT_PRESENT, block_val: 0 };
 const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct BlockInfo {
     pub block_id: BlockId,
     pub block_val: u32,
+}
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct BlockData {
+    pub layer1: BlockInfo,
+    pub layer2: Option<BlockInfo>,
 }
 
 pub struct World {
@@ -38,7 +43,7 @@ struct Chunk {
 }
 
 impl Chunk {
-    fn get_block(&self, w: &WorldPos) -> (BlockInfo, BlockInfo) {
+    fn get_block(&self, w: &WorldPos) -> Option<BlockData> {
         let sub_y = w.subchunk_y();
         let sub_offset = w.subchunk_offset();
 
@@ -46,14 +51,10 @@ impl Chunk {
         match maybe_subchunk {
             Some(subchunk) => {
                 let block1 = subchunk.data1[sub_offset];
-                let block2 = if let Some(data2) = &subchunk.data2 {
-                    data2[sub_offset]
-                } else {
-                    NOT_PRESENT_INFO
-                };
-                (block1, block2)
+                let block2 = subchunk.data2.as_ref().map(|data2| data2[sub_offset]);
+                Some(BlockData { layer1: block1, layer2: block2 })
             }
-            None => (AIR_INFO, NOT_PRESENT_INFO),
+            None => Some(BlockData { layer1: AIR_INFO, layer2: None }),
         }
     }
 }
@@ -154,7 +155,7 @@ impl World {
         }
     }
 
-    pub fn get_block(&self, pos: &WorldPos) -> Result<(BlockInfo, BlockInfo)> {
+    pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockData>> {
         let chunk_pos = pos.chunk_pos();
 
         let mut cache = self.chunk_cache.borrow_mut();
@@ -170,7 +171,7 @@ impl World {
 
         match maybe_chunk {
             Some(chunk) => Ok(chunk.get_block(pos)),
-            None => Ok((NOT_PRESENT_INFO, NOT_PRESENT_INFO)),
+            None => Ok(None),
         }
     }
 
