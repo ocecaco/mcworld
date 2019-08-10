@@ -10,6 +10,8 @@ use crate::table::{BlockId, BlockTable, AIR};
 use crate::error::*;
 
 const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
+const NUM_SUBCHUNKS: u8 = 16;
+const CHUNK_SIZE: usize = 4096;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct BlockInfo {
@@ -20,7 +22,7 @@ pub struct BlockInfo {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct BlockData {
     pub layer1: BlockInfo,
-    pub layer2: Option<BlockInfo>,
+    pub layer2: BlockInfo,
 }
 
 pub struct World {
@@ -33,30 +35,33 @@ pub struct World {
 // each subchunk
 struct WorldSubchunk {
     data1: Vec<BlockInfo>,
-    data2: Option<Vec<BlockInfo>>,
+    data2: Vec<BlockInfo>,
 }
 
 struct Chunk {
-    // subchunks might be missing, which means they are filled with air. The
-    // length of this vector should always be exactly 16, since that is the
-    // number of subchunks per chunk.
-    subchunks: Vec<Option<WorldSubchunk>>,
+    // this vector should always hold 16 subchunks
+    subchunks: Vec<WorldSubchunk>,
 }
 
 impl Chunk {
-    fn get_block(&self, w: &WorldPos) -> Option<BlockData> {
+    fn get_block(&self, w: &WorldPos) -> BlockData {
         let sub_y = w.subchunk_y();
         let sub_offset = w.subchunk_offset();
 
-        let maybe_subchunk = &self.subchunks[sub_y];
-        match maybe_subchunk {
-            Some(subchunk) => {
-                let block1 = subchunk.data1[sub_offset];
-                let block2 = subchunk.data2.as_ref().map(|data2| data2[sub_offset]);
-                Some(BlockData { layer1: block1, layer2: block2 })
-            }
-            None => Some(BlockData { layer1: AIR_INFO, layer2: None }),
-        }
+        let subchunk = &self.subchunks[sub_y];
+        let block1 = subchunk.data1[sub_offset];
+        let block2 = subchunk.data2[sub_offset];
+        BlockData { layer1: block1, layer2: block2 }
+    }
+
+    fn set_block(&mut self, w: &WorldPos, d: BlockData) {
+        let sub_y = w.subchunk_y();
+        let sub_offset = w.subchunk_offset();
+
+        let subchunk = &mut self.subchunks[sub_y];
+
+        subchunk.data1[sub_offset] = d.layer1;
+        subchunk.data2[sub_offset] = d.layer2;
     }
 }
 
@@ -105,10 +110,33 @@ impl World {
             .collect()
     }
 
+    fn create_air_subchunk(&self) -> WorldSubchunk {
+        let blocks = vec![AIR_INFO ;CHUNK_SIZE];
+        WorldSubchunk {
+            data1: blocks.clone(),
+            data2: blocks.clone(),
+        }
+    }
+
     fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<WorldSubchunk>> {
         let maybe_sc = self.raw_world.load_subchunk(pos)?;
 
         Ok(maybe_sc.as_ref().map(|sc| self.convert_subchunk(sc)))
+    }
+
+    fn save_subchunk(&self, pos: &SubchunkPos, sc: &WorldSubchunk) -> Result<()> {
+        let converted = self.convert_world_subchunk(sc);
+        self.raw_world.save_subchunk(pos, &converted)?;
+
+        Ok(())
+    }
+
+    fn load_subchunk_or_air(&self, pos: &SubchunkPos) -> Result<WorldSubchunk> {
+        let maybe_sc = self.load_subchunk(pos)?;
+        match maybe_sc {
+            Some(sc) => Ok(sc),
+            None => Ok(self.create_air_subchunk()),
+        }
     }
 
     fn convert_subchunk(&self, sc: &Subchunk) -> WorldSubchunk {
@@ -124,7 +152,8 @@ impl World {
         let bs2 = sc
             .block_storages
             .get(1)
-            .map(|bs| self.translate_block_storage(&bs));
+            .map(|bs| self.translate_block_storage(&bs))
+            .unwrap_or_else(|| vec![AIR_INFO; CHUNK_SIZE]);
 
         WorldSubchunk {
             data1: bs1,
@@ -163,9 +192,7 @@ impl World {
         let mut layers = Vec::new();
 
         layers.push(self.convert_world_layer(&sc.data1));
-        if let Some(data2) = &sc.data2 {
-            layers.push(self.convert_world_layer(&data2));
-        }
+        layers.push(self.convert_world_layer(&sc.data2));
 
         Subchunk {
             block_storages: layers,
@@ -173,19 +200,17 @@ impl World {
     }
 
     fn load_chunk(&self, pos: &ChunkPos) -> Result<Option<Chunk>> {
-        const NUM_SUBCHUNKS: u8 = 16;
-
         // If the bottom-most subchunk is not there, then the chunk has not been
         // stored in the world. Hence the bottom-most subchunk must be present.
-        let bottom_subchunk = self.load_subchunk(&pos.subchunk_pos(0))?;
+        let maybe_first = self.load_subchunk(&pos.subchunk_pos(0))?;
 
-        if bottom_subchunk.is_some() {
+        if let Some(first) = maybe_first {
             let mut subchunks = Vec::with_capacity(usize::from(NUM_SUBCHUNKS));
-            subchunks.push(bottom_subchunk);
+            subchunks.push(first);
 
             // load the other subchunks as well
             for i in 1..NUM_SUBCHUNKS {
-                subchunks.push(self.load_subchunk(&pos.subchunk_pos(i as u8))?);
+                subchunks.push(self.load_subchunk_or_air(&pos.subchunk_pos(i as u8))?);
             }
 
             Ok(Some(Chunk { subchunks }))
@@ -196,7 +221,13 @@ impl World {
     }
 
     fn save_chunk(&self, pos: &ChunkPos, chunk: &Chunk) -> Result<()> {
-        unimplemented!();
+        // TODO: Optimize so subchunks filled with air at the top of
+        // the world do not get saved.
+        for i in 0..NUM_SUBCHUNKS {
+            self.save_subchunk(&pos.subchunk_pos(i), &chunk.subchunks[usize::from(i)])?;
+        }
+
+        Ok(())
     }
 
     pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockData>> {
@@ -214,9 +245,16 @@ impl World {
         };
 
         match maybe_chunk {
-            Some(chunk) => Ok(chunk.get_block(pos)),
+            Some(chunk) => Ok(Some(chunk.get_block(pos))),
             None => Ok(None),
         }
+    }
+
+    pub fn set_block(&self, pos: &WorldPos, data: BlockData) {
+    }
+
+    pub fn save(&self) {
+        unimplemented!();
     }
 
     pub fn block_id(&self, name: &str) -> BlockId {
