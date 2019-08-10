@@ -10,7 +10,7 @@ use crate::pos::*;
 use crate::table::{BlockId, BlockTable, AIR};
 use crate::error::*;
 
-pub const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
+const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
 const NUM_SUBCHUNKS: u8 = 16;
 const CHUNK_SIZE: usize = 4096;
 
@@ -36,11 +36,13 @@ pub struct World {
 
 // uses indices into table stored in the World instead of a separate palette for
 // each subchunk
+#[derive(Debug, Clone)]
 struct WorldSubchunk {
     data1: Vec<BlockInfo>,
     data2: Vec<BlockInfo>,
 }
 
+#[derive(Debug, Clone)]
 struct Chunk {
     // this vector should always hold 16 subchunks
     subchunks: Vec<WorldSubchunk>,
@@ -113,13 +115,6 @@ impl World {
             .collect()
     }
 
-    fn create_air_subchunk(&self) -> WorldSubchunk {
-        let blocks = vec![AIR_INFO ;CHUNK_SIZE];
-        WorldSubchunk {
-            data1: blocks.clone(),
-            data2: blocks.clone(),
-        }
-    }
 
     fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<WorldSubchunk>> {
         let maybe_sc = self.raw_world.load_subchunk(pos)?;
@@ -138,7 +133,7 @@ impl World {
         let maybe_sc = self.load_subchunk(pos)?;
         match maybe_sc {
             Some(sc) => Ok(sc),
-            None => Ok(self.create_air_subchunk()),
+            None => Ok(create_air_subchunk()),
         }
     }
 
@@ -156,7 +151,7 @@ impl World {
             .block_storages
             .get(1)
             .map(|bs| self.translate_block_storage(&bs))
-            .unwrap_or_else(|| vec![AIR_INFO; CHUNK_SIZE]);
+            .unwrap_or_else(|| create_air_layer());
 
         WorldSubchunk {
             data1: bs1,
@@ -223,7 +218,7 @@ impl World {
         }
     }
 
-    fn save_chunk(&self, pos: &ChunkPos, chunk: &Chunk) -> Result<()> {
+    fn do_save_chunk(&self, pos: &ChunkPos, chunk: &Chunk) -> Result<()> {
         // TODO: Optimize so subchunks filled with air at the top of
         // the world do not get saved.
         for i in 0..NUM_SUBCHUNKS {
@@ -233,7 +228,7 @@ impl World {
         Ok(())
     }
 
-    fn delete_chunk(&self, pos: &ChunkPos) -> Result<()> {
+    fn do_delete_chunk(&self, pos: &ChunkPos) -> Result<()> {
         for i in 0..NUM_SUBCHUNKS {
             self.raw_world.delete_subchunk(&pos.subchunk_pos(i))?;
         }
@@ -241,12 +236,7 @@ impl World {
         Ok(())
     }
 
-    fn add_chunk(&self, pos: &ChunkPos) -> Result<()> {
-        unimplemented!();
-    }
-
-    fn cached_chunk<'a>(&self, cache: &'a mut ChunkCache, pos: &WorldPos) -> Result<Option<&'a mut Chunk>> {
-        let chunk_pos = pos.chunk_pos();
+    fn cached_chunk<'a>(&self, cache: &'a mut ChunkCache, chunk_pos: ChunkPos) -> Result<&'a mut Option<Chunk>> {
         let entry = cache.entry(chunk_pos);
 
         // try to load chunk from cache, and otherwise load from disk and put it
@@ -256,12 +246,12 @@ impl World {
             v.insert(chunk);
         }
 
-        Ok(cache.get_mut(&chunk_pos).unwrap().as_mut())
+        Ok(cache.get_mut(&chunk_pos).unwrap())
     }
 
     pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockData>> {
         let mut cache = self.chunk_cache.borrow_mut();
-        let maybe_chunk = self.cached_chunk(&mut cache, pos)?;
+        let maybe_chunk = self.cached_chunk(&mut cache, pos.chunk_pos())?;
 
         match maybe_chunk {
             Some(chunk) => Ok(Some(chunk.get_block(pos))),
@@ -271,7 +261,7 @@ impl World {
 
     pub fn set_block(&self, pos: &WorldPos, data: BlockData) -> Result<()> {
         let mut cache = self.chunk_cache.borrow_mut();
-        let maybe_chunk = self.cached_chunk(&mut cache, pos)?;
+        let maybe_chunk = self.cached_chunk(&mut cache, pos.chunk_pos())?;
 
         match maybe_chunk {
             Some(chunk) => {
@@ -282,14 +272,26 @@ impl World {
         }
     }
 
+    pub fn delete_chunk(&self, pos: ChunkPos) -> Result<()> {
+        let mut cache = self.chunk_cache.borrow_mut();
+        cache.insert(pos, None);
+        Ok(())
+    }
+
+    pub fn add_chunk(&self, pos: ChunkPos) -> Result<()> {
+        let mut cache = self.chunk_cache.borrow_mut();
+        cache.insert(pos, Some(create_air_chunk()));
+        Ok(())
+    }
+
     pub fn save(&self) -> Result<()> {
         let cache = self.chunk_cache.borrow();
 
         for (pos, chunk) in cache.iter() {
             if let Some(c) = chunk {
-                self.save_chunk(pos, c)?;
+                self.do_save_chunk(pos, c)?;
             } else {
-                self.delete_chunk(pos)?;
+                self.do_delete_chunk(pos)?;
             }
         }
 
@@ -302,5 +304,26 @@ impl World {
 
     pub fn block_name(&self, id: BlockId) -> String {
         self.global_palette.borrow_mut().get_name(id).to_owned()
+    }
+}
+
+fn create_air_layer() -> Vec<BlockInfo> {
+    vec![AIR_INFO ;CHUNK_SIZE]
+}
+
+fn create_air_subchunk() -> WorldSubchunk {
+    let blocks = create_air_layer();
+
+    WorldSubchunk {
+        data1: blocks.clone(),
+        data2: blocks.clone(),
+    }
+}
+
+fn create_air_chunk() -> Chunk {
+    let sc = create_air_subchunk();
+    let subchunks = vec![sc.clone(); usize::from(NUM_SUBCHUNKS)];
+    Chunk {
+        subchunks,
     }
 }

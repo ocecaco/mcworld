@@ -2,13 +2,14 @@
 #![allow(unused_imports)]
 #![warn(clippy::all)]
 use crate::table::{BlockId, AIR};
-use crate::world::{World, BlockData};
+use crate::world::{World, BlockData, BlockInfo};
 use crate::pos::{WorldPos, Dimension};
 use crate::neighbor::NeighborIterator;
 use crate::error::*;
 
 use std::path::Path;
 use fnv::FnvHashMap;
+use fnv::FnvHashSet;
 use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
 use std::io::{self, Write};
@@ -26,16 +27,16 @@ mod error {
 
 type ParentMap = FnvHashMap<WorldPos, WorldPos>;
 
-fn is_inside(world: &World, mut pos: WorldPos) -> Result<bool> {
+fn is_inside(world: &World, mut pos: WorldPos) -> Result<Option<bool>> {
     let data = world.get_block(&pos)?;
 
     // stop if the starting block is not air
     if let Some(blk) = data {
         if blk.layer1.block_id != AIR {
-            return Ok(false);
+            return Ok(Some(false));
         }
     } else {
-        return Ok(false);
+        return Ok(None);
     }
 
     // go up in height until we find a non-air block or we hit the ceiling
@@ -49,20 +50,28 @@ fn is_inside(world: &World, mut pos: WorldPos) -> Result<bool> {
     }
 
     // we are inside if we did not hit the world ceiling before stopping
-    Ok(pos.y != 255)
+    Ok(Some(pos.y != 255))
 }
 
-fn is_air(world: &World, pos: WorldPos) -> Result<bool> {
-    if let Some(blk) = world.get_block(&pos)? {
-        Ok(blk.layer1.block_id == AIR)
-    } else {
-        Ok(false)
-    }
-}
+// fn is_air(world: &World, pos: WorldPos) -> Result<bool> {
+//     if let Some(blk) = world.get_block(&pos)? {
+//         Ok(blk.layer1.block_id == AIR)
+//     } else {
+//         Ok(false)
+//     }
+// }
 
-fn bfs(world: &World, start_pos: WorldPos) -> Result<ParentMap> {
+fn bfs(world: &World, start_pos: WorldPos) -> Result<(FnvHashSet<WorldPos>, ParentMap)> {
     let mut parents = FnvHashMap::default();
     let mut queue = VecDeque::new();
+    let mut clipped = FnvHashSet::default();
+
+    // let diamond_id = world.block_id("minecraft:diamond_block");
+    // let air_id = world.block_id("minecraft:air");
+    // let diamond_block = BlockData {
+    //     layer1: BlockInfo { block_id: diamond_id, block_val: 0 },
+    //     layer2: BlockInfo { block_id: air_id, block_val: 0 },
+    // };
 
     parents.insert(start_pos, start_pos);
     queue.push_back(start_pos);
@@ -75,15 +84,19 @@ fn bfs(world: &World, start_pos: WorldPos) -> Result<ParentMap> {
             // seen, nodes which we have already seen will have a
             // parent node
             if let Entry::Vacant(o) = parents.entry(neighbor) {
-                if is_air(world, neighbor)? {
-                    o.insert(source);
-                    queue.push_back(neighbor);
+                if let Some(inside) = is_inside(world, neighbor)? {
+                    if inside {
+                        o.insert(source);
+                        queue.push_back(neighbor);
+                    }
+                } else {
+                    clipped.insert(neighbor);
                 }
             }
         }
     }
 
-    Ok(parents)
+    Ok((clipped, parents))
 }
 
 fn get_path(parents: &ParentMap, mut current_pos: WorldPos) -> Vec<WorldPos> {
@@ -105,11 +118,13 @@ fn main() {
     let world = World::open(&path).unwrap();
 
     let start_pos = WorldPos {
-        x: -34,
-        y: 16,
+        x: -35,
+        y: 13,
         z: -19,
         dimension: Dimension::Overworld,
     };
 
-    let parents = bfs(&world, start_pos).unwrap();
+    let _parents = bfs(&world, start_pos).unwrap();
+
+    world.save().unwrap();
 }
