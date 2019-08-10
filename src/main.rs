@@ -52,6 +52,14 @@ fn is_inside(world: &World, mut pos: WorldPos) -> Result<bool> {
     Ok(pos.y != 255)
 }
 
+fn is_air(world: &World, pos: WorldPos) -> Result<bool> {
+    if let Some(blk) = world.get_block(&pos)? {
+        Ok(blk.layer1.block_id == AIR)
+    } else {
+        Ok(false)
+    }
+}
+
 fn bfs(world: &World, start_pos: WorldPos) -> Result<ParentMap> {
     let mut parents = FnvHashMap::default();
     let mut queue = VecDeque::new();
@@ -67,7 +75,7 @@ fn bfs(world: &World, start_pos: WorldPos) -> Result<ParentMap> {
             // seen, nodes which we have already seen will have a
             // parent node
             if let Entry::Vacant(o) = parents.entry(neighbor) {
-                if is_inside(world, neighbor)? {
+                if is_air(world, neighbor)? {
                     o.insert(source);
                     queue.push_back(neighbor);
                 }

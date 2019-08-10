@@ -14,6 +14,23 @@ pub struct RawWorld {
     database: Database,
 }
 
+// fn test_roundtrip(chunk: &Subchunk) -> Result<()> {
+//     let mut serialized = Vec::new();
+//     chunk.serialize(&mut serialized)?;
+//     let mut cursor = Cursor::new(&serialized);
+//     let deserialized = Subchunk::deserialize(&mut cursor)?;
+
+//     assert_eq!(chunk.block_storages.len(), deserialized.block_storages.len());
+
+//     for (bs1, bs2) in chunk.block_storages.iter().zip(&deserialized.block_storages) {
+//         for (b1, b2) in bs1.blocks.iter().zip(&bs2.blocks) {
+//             assert_eq!(b1, b2);
+//         }
+//     }
+
+//     Ok(())
+// }
+
 impl RawWorld {
     pub fn open(path: &Path) -> Result<RawWorld> {
         let mut options = Options::default();
@@ -36,6 +53,7 @@ impl RawWorld {
             let mut cursor = Cursor::new(b);
 
             let chunk = Subchunk::deserialize(&mut cursor)?;
+            // test_roundtrip(&chunk)?;
 
             // make sure we consume ALL of the data
             assert_eq!(cursor.position() as usize, len);
