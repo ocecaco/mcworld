@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::path::Path;
 use fnv::FnvHashMap;
 use fnv::FnvHashSet;
+use std::collections::hash_map::Entry;
 
 use crate::raw::RawWorld;
 use crate::raw::subchunk::{Subchunk, BlockStorage, PaletteEntry};
@@ -9,7 +10,7 @@ use crate::pos::*;
 use crate::table::{BlockId, BlockTable, AIR};
 use crate::error::*;
 
-const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
+pub const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
 const NUM_SUBCHUNKS: u8 = 16;
 const CHUNK_SIZE: usize = 4096;
 
@@ -25,10 +26,12 @@ pub struct BlockData {
     pub layer2: BlockInfo,
 }
 
+type ChunkCache = FnvHashMap<ChunkPos, Option<Chunk>>;
+
 pub struct World {
     raw_world: RawWorld,
     global_palette: RefCell<BlockTable>,
-    chunk_cache: RefCell<FnvHashMap<ChunkPos, Option<Chunk>>>,
+    chunk_cache: RefCell<ChunkCache>,
 }
 
 // uses indices into table stored in the World instead of a separate palette for
@@ -230,19 +233,35 @@ impl World {
         Ok(())
     }
 
-    pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockData>> {
-        let chunk_pos = pos.chunk_pos();
+    fn delete_chunk(&self, pos: &ChunkPos) -> Result<()> {
+        for i in 0..NUM_SUBCHUNKS {
+            self.raw_world.delete_subchunk(&pos.subchunk_pos(i))?;
+        }
 
-        let mut cache = self.chunk_cache.borrow_mut();
+        Ok(())
+    }
+
+    fn add_chunk(&self, pos: &ChunkPos) -> Result<()> {
+        unimplemented!();
+    }
+
+    fn cached_chunk<'a>(&self, cache: &'a mut ChunkCache, pos: &WorldPos) -> Result<Option<&'a mut Chunk>> {
+        let chunk_pos = pos.chunk_pos();
+        let entry = cache.entry(chunk_pos);
+
         // try to load chunk from cache, and otherwise load from disk and put it
         // in the cache
-        let maybe_chunk = if let Some(c) = cache.get(&chunk_pos) {
-            c
-        } else {
+        if let Entry::Vacant(v) = entry {
             let chunk = self.load_chunk(&chunk_pos)?;
-            cache.insert(chunk_pos, chunk);
-            &cache[&chunk_pos]
-        };
+            v.insert(chunk);
+        }
+
+        Ok(cache.get_mut(&chunk_pos).unwrap().as_mut())
+    }
+
+    pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockData>> {
+        let mut cache = self.chunk_cache.borrow_mut();
+        let maybe_chunk = self.cached_chunk(&mut cache, pos)?;
 
         match maybe_chunk {
             Some(chunk) => Ok(Some(chunk.get_block(pos))),
@@ -250,11 +269,31 @@ impl World {
         }
     }
 
-    pub fn set_block(&self, pos: &WorldPos, data: BlockData) {
+    pub fn set_block(&self, pos: &WorldPos, data: BlockData) -> Result<()> {
+        let mut cache = self.chunk_cache.borrow_mut();
+        let maybe_chunk = self.cached_chunk(&mut cache, pos)?;
+
+        match maybe_chunk {
+            Some(chunk) => {
+                chunk.set_block(pos, data);
+                Ok(())
+            },
+            None => panic!("out of bounds"),
+        }
     }
 
-    pub fn save(&self) {
-        unimplemented!();
+    pub fn save(&self) -> Result<()> {
+        let cache = self.chunk_cache.borrow();
+
+        for (pos, chunk) in cache.iter() {
+            if let Some(c) = chunk {
+                self.save_chunk(pos, c)?;
+            } else {
+                self.delete_chunk(pos)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn block_id(&self, name: &str) -> BlockId {

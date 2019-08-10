@@ -78,6 +78,17 @@ impl RawWorld {
         Ok(())
     }
 
+    pub fn delete_subchunk(&self, pos: &SubchunkPos) -> Result<()> {
+        let mut key_buf = [0u8; 32];
+        let key_slice = encode_into_buffer(pos, &mut key_buf[..])?;
+
+        let write_options = WriteOptions::default();
+
+        self.database.delete(&write_options, key_slice)?;
+
+        Ok(())
+    }
+
     pub fn iter_chunks(&self) -> SubchunkIterator {
         let read_options = ReadOptions::default();
         let dbiter = self.database.iter(&read_options);
