@@ -13,7 +13,7 @@ const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct BlockInfo {
     pub block_id: BlockId,
-    pub block_val: u32,
+    pub block_val: u16,
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

@@ -82,7 +82,7 @@ where
         };
         Ok(PaletteEntry {
             name,
-            val: val as u32,
+            val: val as u16,
         })
     }
 }

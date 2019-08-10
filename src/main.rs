@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 #![warn(clippy::all)]
 use crate::table::{BlockId, AIR};
-use crate::world::World;
+use crate::world::{World, BlockData};
 use crate::pos::{WorldPos, Dimension};
 use crate::neighbor::NeighborIterator;
 use crate::error::*;
@@ -40,12 +40,12 @@ fn is_inside(world: &World, mut pos: WorldPos) -> Result<bool> {
 
     // go up in height until we find a non-air block or we hit the ceiling
     loop {
+        pos.y += 1;
         let data = world.get_block(&pos)?;
         let data = data.expect("should never go out of world bounds when increasing y since y is a u8");
         if data.layer1.block_id != AIR || pos.y == 255 {
             break;
         }
-        pos.y += 1;
     }
 
     Ok(pos.y != 255)
@@ -145,6 +145,9 @@ fn main() {
     //     z: -1,
     //     dimension: Dimension::Overworld,
     // };
+    use std::mem::size_of;
+    println!("Size: {:?}", size_of::<Option<BlockData>>());
+
     let start_pos = WorldPos {
         x: -34,
         y: 16,

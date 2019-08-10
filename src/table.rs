@@ -1,14 +1,14 @@
 use fnv::FnvHashMap;
-use std::num::NonZeroU32;
+use std::num::NonZeroU16;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct BlockId(NonZeroU32);
+pub struct BlockId(NonZeroU16);
 
-pub const AIR: BlockId = BlockId(unsafe { NonZeroU32::new_unchecked(1) });
+pub const AIR: BlockId = BlockId(unsafe { NonZeroU16::new_unchecked(1) });
 
 pub struct BlockTable {
     id_to_name: Vec<String>,
-    name_to_id: FnvHashMap<String, u32>,
+    name_to_id: FnvHashMap<String, BlockId>,
 }
 
 impl BlockTable {
@@ -18,7 +18,7 @@ impl BlockTable {
         // this code should match the constants
         let id_to_name = vec![air.clone()];
         let mut name_to_id = FnvHashMap::default();
-        name_to_id.insert(air, 1);
+        name_to_id.insert(air, AIR);
 
         BlockTable {
             id_to_name,
@@ -28,14 +28,15 @@ impl BlockTable {
 
     pub fn get_id(&mut self, name: &str) -> BlockId {
         if let Some(id) = self.name_to_id.get(name) {
-            BlockId(NonZeroU32::new(*id).unwrap())
+            *id
         } else {
-            let id = self.id_to_name.len() as u32 + 1;
+            let id = self.id_to_name.len() as u16 + 1;
+            let id = BlockId(NonZeroU16::new(id).unwrap());
 
             self.id_to_name.push(name.to_owned());
             self.name_to_id.insert(name.to_owned(), id);
 
-            BlockId(NonZeroU32::new(id).unwrap())
+            id
         }
     }
 

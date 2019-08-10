@@ -20,7 +20,7 @@ pub struct BlockStorage {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct PaletteEntry {
     pub name: String,
-    pub val: u32,
+    pub val: u16,
 }
 
 impl Subchunk {
