@@ -151,7 +151,7 @@ impl World {
             .block_storages
             .get(1)
             .map(|bs| self.translate_block_storage(&bs))
-            .unwrap_or_else(|| create_air_layer());
+            .unwrap_or_else(create_air_layer);
 
         WorldSubchunk {
             data1: bs1,

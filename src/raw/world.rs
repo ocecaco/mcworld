@@ -1,35 +1,18 @@
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use leveldb::database::iterator::DatabaseIterator;
 use leveldb::database::Database;
 use leveldb::options::{Compression, Options, ReadOptions, WriteOptions};
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read};
 use std::path::Path;
 
 use crate::error::*;
-use crate::raw::encode::{encode_into_buffer, Encode};
+use crate::raw::encode::{encode_into_buffer};
 use crate::raw::subchunk::Subchunk;
 use crate::pos::*;
 
 pub struct RawWorld {
     database: Database,
 }
-
-// fn test_roundtrip(chunk: &Subchunk) -> Result<()> {
-//     let mut serialized = Vec::new();
-//     chunk.serialize(&mut serialized)?;
-//     let mut cursor = Cursor::new(&serialized);
-//     let deserialized = Subchunk::deserialize(&mut cursor)?;
-
-//     assert_eq!(chunk.block_storages.len(), deserialized.block_storages.len());
-
-//     for (bs1, bs2) in chunk.block_storages.iter().zip(&deserialized.block_storages) {
-//         for (b1, b2) in bs1.blocks.iter().zip(&bs2.blocks) {
-//             assert_eq!(b1, b2);
-//         }
-//     }
-
-//     Ok(())
-// }
 
 impl RawWorld {
     pub fn open(path: &Path) -> Result<RawWorld> {
@@ -53,7 +36,6 @@ impl RawWorld {
             let mut cursor = Cursor::new(b);
 
             let chunk = Subchunk::deserialize(&mut cursor)?;
-            // test_roundtrip(&chunk)?;
 
             // make sure we consume ALL of the data
             assert_eq!(cursor.position() as usize, len);
