@@ -173,14 +173,14 @@ impl World {
     }
 
     fn load_chunk(&self, pos: &ChunkPos) -> Result<Option<Chunk>> {
-        const NUM_SUBCHUNKS: usize = 16;
+        const NUM_SUBCHUNKS: u8 = 16;
 
         // If the bottom-most subchunk is not there, then the chunk has not been
         // stored in the world. Hence the bottom-most subchunk must be present.
         let bottom_subchunk = self.load_subchunk(&pos.subchunk_pos(0))?;
 
         if bottom_subchunk.is_some() {
-            let mut subchunks = Vec::with_capacity(NUM_SUBCHUNKS);
+            let mut subchunks = Vec::with_capacity(usize::from(NUM_SUBCHUNKS));
             subchunks.push(bottom_subchunk);
 
             // load the other subchunks as well
@@ -193,6 +193,10 @@ impl World {
             // chunk is not present
             Ok(None)
         }
+    }
+
+    fn save_chunk(&self, pos: &ChunkPos, chunk: &Chunk) -> Result<()> {
+        unimplemented!();
     }
 
     pub fn get_block(&self, pos: &WorldPos) -> Result<Option<BlockData>> {

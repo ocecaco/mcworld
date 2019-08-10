@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use leveldb::database::iterator::DatabaseIterator;
 use leveldb::database::Database;
-use leveldb::options::{Compression, Options, ReadOptions};
+use leveldb::options::{Compression, Options, ReadOptions, WriteOptions};
 use std::io::{Cursor, Read, Write};
 use std::path::Path;
 
@@ -62,6 +62,20 @@ impl RawWorld {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn save_subchunk(&self, pos: &SubchunkPos, sc: &Subchunk) -> Result<()> {
+        let mut key_buf = [0u8; 32];
+        let key_slice = encode_into_buffer(pos, &mut key_buf[..])?;
+
+        let write_options = WriteOptions::default();
+
+        let mut serialized = Vec::new();
+        sc.serialize(&mut serialized)?;
+
+        self.database.put(&write_options, key_slice, &serialized)?;
+
+        Ok(())
     }
 
     pub fn iter_chunks(&self) -> SubchunkIterator {
