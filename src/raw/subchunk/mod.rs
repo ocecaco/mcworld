@@ -2,9 +2,9 @@ mod deserialize;
 mod serialize;
 
 use crate::error::Result;
-use std::io::{Read, Write};
 pub use deserialize::*;
 pub use serialize::*;
+use std::io::{Read, Write};
 
 #[derive(Debug, Clone)]
 pub struct Subchunk {

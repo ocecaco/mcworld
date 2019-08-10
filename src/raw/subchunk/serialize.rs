@@ -1,8 +1,8 @@
-use std::io::Write;
-use nbt::{Blob, Value};
-use byteorder::{LittleEndian, WriteBytesExt};
-use std::convert::TryInto;
 use super::*;
+use byteorder::{LittleEndian, WriteBytesExt};
+use nbt::{Blob, Value};
+use std::convert::TryInto;
+use std::io::Write;
 
 pub struct Encoder<'a, T: 'a> {
     writer: &'a mut T,
@@ -76,8 +76,13 @@ where
 
     fn encode_palette_entry(&mut self, entry: &PaletteEntry) -> Result<()> {
         let mut nbt = Blob::new();
-        nbt.insert("name".to_owned(), Value::String(entry.name.clone())).unwrap();
-        nbt.insert("val".to_owned(), Value::Short(entry.val.try_into().unwrap())).unwrap();
+        nbt.insert("name".to_owned(), Value::String(entry.name.clone()))
+            .unwrap();
+        nbt.insert(
+            "val".to_owned(),
+            Value::Short(entry.val.try_into().unwrap()),
+        )
+        .unwrap();
 
         nbt.to_writer(self.writer)?;
 

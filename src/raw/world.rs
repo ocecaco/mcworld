@@ -6,9 +6,9 @@ use std::io::{Cursor, Read};
 use std::path::Path;
 
 use crate::error::*;
-use crate::raw::encode::{encode_into_buffer};
-use crate::raw::subchunk::Subchunk;
 use crate::pos::*;
+use crate::raw::encode::encode_into_buffer;
+use crate::raw::subchunk::Subchunk;
 
 pub struct RawWorld {
     database: Database,

@@ -1,7 +1,7 @@
+use super::*;
 use byteorder::{LittleEndian, ReadBytesExt};
 use nbt::{Blob, Value};
 use std::io::Read;
-use super::*;
 
 pub struct Decoder<'a, T: 'a> {
     reader: &'a mut T,

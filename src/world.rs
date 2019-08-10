@@ -1,16 +1,19 @@
-use std::cell::RefCell;
-use std::path::Path;
 use fnv::FnvHashMap;
 use fnv::FnvHashSet;
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
+use std::path::Path;
 
-use crate::raw::RawWorld;
-use crate::raw::subchunk::{Subchunk, BlockStorage, PaletteEntry};
-use crate::pos::*;
-use crate::table::{BlockId, BlockTable, AIR};
 use crate::error::*;
+use crate::pos::*;
+use crate::raw::subchunk::{BlockStorage, PaletteEntry, Subchunk};
+use crate::raw::RawWorld;
+use crate::table::{BlockId, BlockTable, AIR};
 
-const AIR_INFO: BlockInfo = BlockInfo { block_id: AIR, block_val: 0 };
+const AIR_INFO: BlockInfo = BlockInfo {
+    block_id: AIR,
+    block_val: 0,
+};
 const NUM_SUBCHUNKS: u8 = 16;
 const CHUNK_SIZE: usize = 4096;
 
@@ -56,7 +59,10 @@ impl Chunk {
         let subchunk = &self.subchunks[sub_y];
         let block1 = subchunk.data1[sub_offset];
         let block2 = subchunk.data2[sub_offset];
-        BlockData { layer1: block1, layer2: block2 }
+        BlockData {
+            layer1: block1,
+            layer2: block2,
+        }
     }
 
     fn set_block(&mut self, w: &WorldPos, d: BlockData) {
@@ -104,9 +110,7 @@ impl World {
             .iter()
             .map(|b| {
                 let description = &storage.palette[*b as usize];
-                let block_id = self.global_palette
-                    .borrow_mut()
-                    .get_id(&description.name);
+                let block_id = self.global_palette.borrow_mut().get_id(&description.name);
                 BlockInfo {
                     block_id,
                     block_val: description.val,
@@ -114,7 +118,6 @@ impl World {
             })
             .collect()
     }
-
 
     fn load_subchunk(&self, pos: &SubchunkPos) -> Result<Option<WorldSubchunk>> {
         let maybe_sc = self.raw_world.load_subchunk(pos)?;
@@ -159,19 +162,29 @@ impl World {
         }
     }
 
-    fn create_palette(&self, layer: &[BlockInfo]) -> (FnvHashMap<BlockInfo, u16>, Vec<PaletteEntry>) {
+    fn create_palette(
+        &self,
+        layer: &[BlockInfo],
+    ) -> (FnvHashMap<BlockInfo, u16>, Vec<PaletteEntry>) {
         let unique_blocks: FnvHashSet<BlockInfo> = layer.iter().cloned().collect();
         let unique_blocks: Vec<BlockInfo> = unique_blocks.iter().cloned().collect();
 
         // mapping from BlockInfo to index in the palette
-        let mapping = unique_blocks.iter().enumerate().map(|(i, bi)| (*bi, i as u16)).collect();
+        let mapping = unique_blocks
+            .iter()
+            .enumerate()
+            .map(|(i, bi)| (*bi, i as u16))
+            .collect();
 
         // create a palette by looking up the names corresponding to
         // the block IDs
-        let palette = unique_blocks.iter().map(|bi| PaletteEntry {
-            name: self.block_name(bi.block_id),
-            val: bi.block_val,
-        }).collect();
+        let palette = unique_blocks
+            .iter()
+            .map(|bi| PaletteEntry {
+                name: self.block_name(bi.block_id),
+                val: bi.block_val,
+            })
+            .collect();
 
         (mapping, palette)
     }
@@ -236,7 +249,11 @@ impl World {
         Ok(())
     }
 
-    fn cached_chunk<'a>(&self, cache: &'a mut ChunkCache, chunk_pos: ChunkPos) -> Result<&'a mut Option<Chunk>> {
+    fn cached_chunk<'a>(
+        &self,
+        cache: &'a mut ChunkCache,
+        chunk_pos: ChunkPos,
+    ) -> Result<&'a mut Option<Chunk>> {
         let entry = cache.entry(chunk_pos);
 
         // try to load chunk from cache, and otherwise load from disk and put it
@@ -267,7 +284,7 @@ impl World {
             Some(chunk) => {
                 chunk.set_block(pos, data);
                 Ok(())
-            },
+            }
             None => panic!("out of bounds"),
         }
     }
@@ -308,7 +325,7 @@ impl World {
 }
 
 fn create_air_layer() -> Vec<BlockInfo> {
-    vec![AIR_INFO ;CHUNK_SIZE]
+    vec![AIR_INFO; CHUNK_SIZE]
 }
 
 fn create_air_subchunk() -> WorldSubchunk {
@@ -323,7 +340,5 @@ fn create_air_subchunk() -> WorldSubchunk {
 fn create_air_chunk() -> Chunk {
     let sc = create_air_subchunk();
     let subchunks = vec![sc.clone(); usize::from(NUM_SUBCHUNKS)];
-    Chunk {
-        subchunks,
-    }
+    Chunk { subchunks }
 }

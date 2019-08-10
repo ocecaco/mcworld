@@ -1,8 +1,8 @@
 #![warn(clippy::all)]
-mod table;
-pub mod world;
 pub mod pos;
 pub mod raw;
+mod table;
+pub mod world;
 
 pub mod error {
     pub use failure::Error;
