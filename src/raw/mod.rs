@@ -1,6 +1,6 @@
 pub mod encode;
-pub mod chunk;
+pub mod subchunk;
 mod world;
 
 pub use world::RawWorld;
-pub use chunk::Subchunk;
+pub use subchunk::Subchunk;

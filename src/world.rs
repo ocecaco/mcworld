@@ -3,7 +3,7 @@ use std::path::Path;
 use fnv::FnvHashMap;
 
 use crate::raw::RawWorld;
-use crate::raw::chunk::BlockStorage;
+use crate::raw::subchunk::BlockStorage;
 use crate::pos::*;
 use crate::table::{BlockId, BlockTable, AIR, NOT_PRESENT};
 use crate::error::*;

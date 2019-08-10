@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::error::*;
 use crate::raw::encode::{encode_into_buffer, Encode};
-use crate::raw::chunk::Subchunk;
+use crate::raw::subchunk::Subchunk;
 use crate::pos::*;
 
 pub struct RawWorld {
